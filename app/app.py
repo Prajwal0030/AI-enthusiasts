@@ -33,6 +33,8 @@ def get_stock_data(symbol):
     current_price = data["Close"].iloc[-1]
     avg_price = data["Close"].mean()
     volume = data["Volume"].iloc[-1]
+    info = stock.info
+    company_name = info.get("longName", symbol)
 
     return {
         "symbol": symbol,
@@ -45,6 +47,7 @@ def get_stock_data(symbol):
 # UI
 # -------------------------
 st.title("📈 Multi-Agent Financial Research AI")
+st.write(f"### {stock_info['company_name']}")
 
 symbol_input = st.text_input("Enter Indian Stock Symbol (e.g., RELIANCE, TCS, INFY)")
 
