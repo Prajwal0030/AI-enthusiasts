@@ -56,7 +56,7 @@ def get_stock_data(symbol: str) -> str:
 # LLM SETUP
 # -------------------------
 
-)
+
 llm = ChatGroq(
     model="llama-3.1-8b-instant",
     temperature=0,
