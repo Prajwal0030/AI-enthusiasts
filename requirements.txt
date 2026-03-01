@@ -1,1 +1,6 @@
-
+langchain
+openai
+yfinance
+pandas
+streamlit
+plotly
