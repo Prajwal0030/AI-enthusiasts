@@ -17,6 +17,11 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 # -------------------------
 @tool
 def get_stock_data(symbol: str) -> str:
+    """
+    Fetches stock price information for an Indian stock symbol.
+    Example input: RELIANCE.NS
+    Returns current price, 7-day average, and latest volume.
+    """
     stock = yf.Ticker(symbol)
     data = stock.history(period="7d")
 
