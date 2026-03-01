@@ -47,7 +47,7 @@ def get_stock_data(symbol):
 # UI
 # -------------------------
 st.title("📈 Multi-Agent Financial Research AI")
-st.write(f"### {stock_info['company_name']}")
+st.write(f"### {stock.info['company_name']}")
 
 symbol_input = st.text_input("Enter Indian Stock Symbol (e.g., RELIANCE, TCS, INFY)")
 
