@@ -55,11 +55,14 @@ def get_stock_data(symbol: str) -> str:
 # -------------------------
 # LLM SETUP
 # -------------------------
+
+)
 llm = ChatGroq(
     model="llama-3.1-8b-instant",
-    temperature=0
+    temperature=0,
+    groq_api_key=GROQ_API_KEY,
+    streaming=False
 )
-
 prompt = ChatPromptTemplate.from_messages(
     [
         ("system", "You are a financial research assistant for Indian markets. Call tools only once."),
@@ -71,7 +74,12 @@ prompt = ChatPromptTemplate.from_messages(
 tools = [get_stock_data]
 
 agent = create_tool_calling_agent(llm, tools, prompt)
-agent_executor = AgentExecutor(agent=agent, tools=tools)
+agent_executor = AgentExecutor(
+    agent=agent,
+    tools=tools,
+    verbose=True,
+    handle_parsing_errors=True
+)
 
 # -------------------------
 # STREAMLIT UI
