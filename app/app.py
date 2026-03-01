@@ -46,7 +46,12 @@ def get_stock_data(symbol):
 # -------------------------
 st.title("📈 Multi-Agent Financial Research AI")
 
-symbol = st.text_input("Enter Indian Stock Symbol (e.g., RELIANCE.NS)")
+symbol_input = st.text_input("Enter Indian Stock Symbol (e.g., RELIANCE, TCS, INFY)")
+
+symbol = symbol_input.strip().upper()
+
+if symbol and not symbol.endswith(".NS"):
+    symbol = symbol + ".NS"
 
 if st.button("Analyze") and symbol:
 
