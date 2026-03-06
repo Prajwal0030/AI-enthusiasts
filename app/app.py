@@ -2,6 +2,7 @@ import streamlit as st
 import yfinance as yf
 import plotly.graph_objects as go
 import pandas as pd
+import requests
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage
 import os
@@ -9,11 +10,17 @@ import os
 # -------------------------
 # API KEY & LLM SETUP
 # -------------------------
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+# Streamlit will automatically load these if they are in .streamlit/secrets.toml
+# or configured in Streamlit Cloud Secrets.
+GROQ_API_KEY = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
+NEWS_API_KEY = os.getenv("NEWS_API_KEY") or st.secrets.get("NEWS_API_KEY")
 
 if not GROQ_API_KEY:
-    st.error("GROQ_API_KEY not found in Streamlit Secrets.")
+    st.error("GROQ_API_KEY not found. Please add it to your secrets.")
     st.stop()
+    
+if not NEWS_API_KEY:
+    st.warning("NEWS_API_KEY not found. News sentiment will be disabled.")
 
 llm = ChatGroq(
     model="llama-3.1-8b-instant",
@@ -44,16 +51,13 @@ def get_stock_data(symbol):
 
 def get_technical_indicators(symbol):
     stock = yf.Ticker(symbol)
-    # Fetch enough history to calculate 14-day indicators accurately
     data = stock.history(period="1mo")
     
     if data.empty or len(data) < 15:
         return None
         
-    # Calculate 14-day SMA
     data['SMA_14'] = data['Close'].rolling(window=14).mean()
     
-    # Calculate 14-day RSI
     delta = data['Close'].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
@@ -69,15 +73,24 @@ def get_technical_indicators(symbol):
     }
 
 def get_latest_news(symbol):
-    stock = yf.Ticker(symbol)
-    news_items = stock.news
-    
-    if not news_items:
-        return "No recent news found."
+    if not NEWS_API_KEY:
+        return "News API key missing."
         
-    # Extract the titles of the top 3 news articles safely
-    headlines = [item.get('title', 'Headline unavailable') for item in news_items[:3]]
-    return "\n".join(headlines)
+    # Clean the symbol for a better news search (e.g., RELIANCE.NS -> RELIANCE India)
+    search_query = f"{symbol.replace('.NS', '').replace('.BO', '')} India market"
+    url = f"https://newsapi.org/v2/everything?q={search_query}&language=en&sortBy=publishedAt&pageSize=3&apiKey={NEWS_API_KEY}"
+    
+    try:
+        response = requests.get(url)
+        data = response.json()
+        
+        if data.get("status") == "ok" and data.get("articles"):
+            headlines = [article["title"] for article in data["articles"]]
+            return "\n".join(headlines)
+        else:
+            return "No recent news found for this stock."
+    except Exception as e:
+        return f"Error fetching news: {str(e)}"
 
 # -------------------------
 # LLM AGENTS
@@ -108,6 +121,9 @@ def technical_analysis_agent(symbol, tech_data):
     return llm.invoke([HumanMessage(content=prompt)]).content
 
 def news_sentiment_agent(symbol, news_headlines):
+    if "missing" in news_headlines or "Error" in news_headlines or "No recent news" in news_headlines:
+        return "Could not analyze sentiment due to lack of news data."
+        
     prompt = f"""
     You are a News Sentiment Agent. Analyze the sentiment of these recent headlines for {symbol}:
     {news_headlines}
