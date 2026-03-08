@@ -146,7 +146,7 @@ def supervisor_agent(symbol, price_insight, tech_insight, news_insight):
 # -------------------------
 # UI
 # -------------------------
-st.title("📈 Multi-Agent Financial Research AI")
+st.title("Multi-Agent Financial Research AI")
 
 symbol_input = st.text_input("Enter Indian Stock Symbol (e.g., RELIANCE, TCS, INFY)")
 
@@ -180,13 +180,13 @@ if st.button("Analyze") and symbol:
             col1, col2, col3 = st.columns(3)
             
             with col1:
-                st.subheader("📊 Price Data")
+                st.subheader("Price Data")
                 st.write(f"**Price:** ₹{stock_info['current_price']}")
                 st.write(f"**Volume:** {stock_info['volume']}")
                 st.info(price_insight)
                 
             with col2:
-                st.subheader("📈 Technicals")
+                st.subheader("Technicals")
                 if tech_info:
                     st.write(f"**SMA (14):** ₹{tech_info['sma_14']}")
                     st.write(f"**RSI (14):** {tech_info['rsi_14']}")
@@ -195,13 +195,13 @@ if st.button("Analyze") and symbol:
                 st.info(tech_insight)
                 
             with col3:
-                st.subheader("📰 Sentiment")
+                st.subheader("Sentiment")
                 st.write("**Latest Headlines:**")
                 st.caption(news_headlines)
                 st.info(news_insight)
 
             st.markdown("---")
-            st.subheader("🤖 Supervisor Executive Summary")
+            st.subheader("Supervisor Executive Summary")
             st.write(final_summary)
 
             # 5. Display Chart
