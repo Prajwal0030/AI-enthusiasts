@@ -1,27 +1,24 @@
 import streamlit as st
 import yfinance as yf
 import plotly.graph_objects as go
-import pandas as pd
 import requests
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage
 import os
 
 # -------------------------
-# API KEY & LLM SETUP
+# API KEYS
 # -------------------------
-# Streamlit will automatically load these if they are in .streamlit/secrets.toml
-# or configured in Streamlit Cloud Secrets.
 GROQ_API_KEY = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY") or st.secrets.get("NEWS_API_KEY")
 
 if not GROQ_API_KEY:
-    st.error("GROQ_API_KEY not found. Please add it to your secrets.")
+    st.error("GROQ_API_KEY not found")
     st.stop()
-    
-if not NEWS_API_KEY:
-    st.warning("NEWS_API_KEY not found. News sentiment will be disabled.")
 
+# -------------------------
+# LLM SETUP
+# -------------------------
 llm = ChatGroq(
     model="llama-3.1-8b-instant",
     temperature=0,
@@ -29,188 +26,286 @@ llm = ChatGroq(
 )
 
 # -------------------------
-# STOCK DATA FUNCTIONS
+# DATA FUNCTIONS
 # -------------------------
 def get_stock_data(symbol):
+
     stock = yf.Ticker(symbol)
     data = stock.history(period="7d")
 
     if data.empty:
         return None
 
-    current_price = data["Close"].iloc[-1]
-    avg_price = data["Close"].mean()
-    volume = data["Volume"].iloc[-1]
-
     return {
         "symbol": symbol,
-        "current_price": round(current_price, 2),
-        "avg_price": round(avg_price, 2),
-        "volume": int(volume)
+        "current_price": round(data["Close"].iloc[-1], 2),
+        "avg_price": round(data["Close"].mean(), 2),
+        "volume": int(data["Volume"].iloc[-1])
     }
+
 
 def get_technical_indicators(symbol):
+
     stock = yf.Ticker(symbol)
     data = stock.history(period="1mo")
-    
-    if data.empty or len(data) < 15:
+
+    if len(data) < 15:
         return None
-        
-    data['SMA_14'] = data['Close'].rolling(window=14).mean()
-    
-    delta = data['Close'].diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-    rs = gain / loss
-    data['RSI_14'] = 100 - (100 / (1 + rs))
-    
-    latest_sma = data['SMA_14'].iloc[-1]
-    latest_rsi = data['RSI_14'].iloc[-1]
-    
+
+    data["SMA_14"] = data["Close"].rolling(window=14).mean()
+
+    delta = data["Close"].diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+
+    avg_gain = gain.rolling(14).mean()
+    avg_loss = loss.rolling(14).mean()
+
+    rs = avg_gain / avg_loss
+    data["RSI"] = 100 - (100 / (1 + rs))
+
     return {
-        "sma_14": round(latest_sma, 2),
-        "rsi_14": round(latest_rsi, 2)
+        "sma": round(data["SMA_14"].iloc[-1], 2),
+        "rsi": round(data["RSI"].iloc[-1], 2)
     }
 
+
 def get_latest_news(symbol):
+
     if not NEWS_API_KEY:
-        return "News API key missing."
-        
-    # Clean the symbol for a better news search (e.g., RELIANCE.NS -> RELIANCE India)
-    search_query = f"{symbol.replace('.NS', '').replace('.BO', '')} India market"
-    url = f"https://newsapi.org/v2/everything?q={search_query}&language=en&sortBy=publishedAt&pageSize=3&apiKey={NEWS_API_KEY}"
-    
+        return "News API key missing"
+
+    query = symbol.replace(".NS", "")
+
+    url = f"https://newsapi.org/v2/everything?q={query}&pageSize=3&apiKey={NEWS_API_KEY}"
+
     try:
-        response = requests.get(url)
-        data = response.json()
-        
-        if data.get("status") == "ok" and data.get("articles"):
-            headlines = [article["title"] for article in data["articles"]]
+        res = requests.get(url).json()
+        headlines = [a["title"] for a in res.get("articles", [])]
+
+        if headlines:
             return "\n".join(headlines)
         else:
-            return "No recent news found for this stock."
-    except Exception as e:
-        return f"Error fetching news: {str(e)}"
+            return "No recent news found"
+
+    except:
+        return "News fetch error"
+
 
 # -------------------------
-# LLM AGENTS
+# AGENTS
 # -------------------------
 def stock_data_agent(stock_info):
+
     prompt = f"""
-    You are a Stock Data Agent. Briefly interpret this market data:
-    Symbol: {stock_info['symbol']}
-    Current Price: ₹{stock_info['current_price']}
-    7-Day Average: ₹{stock_info['avg_price']}
+    You are a financial analyst.
+
+    Interpret this stock data:
+
+    Price: ₹{stock_info['current_price']}
+    Avg Price: ₹{stock_info['avg_price']}
     Volume: {stock_info['volume']}
-    Provide a 2-sentence summary of the price action.
+
+    Give a short interpretation.
     """
+
     return llm.invoke([HumanMessage(content=prompt)]).content
 
-def technical_analysis_agent(symbol, tech_data):
-    if not tech_data:
-        return "Insufficient data for technical analysis."
-        
+
+def technical_agent(symbol, tech):
+
+    if not tech:
+        return "Not enough data for indicators."
+
     prompt = f"""
-    You are a Technical Analysis Agent. Analyze these indicators for {symbol}:
-    14-Day SMA: ₹{tech_data['sma_14']}
-    14-Day RSI: {tech_data['rsi_14']}
-    
-    Note: RSI above 70 is overbought, below 30 is oversold.
-    Provide a 2-sentence technical outlook.
+    Analyze the technical indicators:
+
+    SMA: {tech['sma']}
+    RSI: {tech['rsi']}
+
+    RSI>70 overbought
+    RSI<30 oversold
+
+    Give a short analysis.
     """
+
     return llm.invoke([HumanMessage(content=prompt)]).content
 
-def news_sentiment_agent(symbol, news_headlines):
-    if "missing" in news_headlines or "Error" in news_headlines or "No recent news" in news_headlines:
-        return "Could not analyze sentiment due to lack of news data."
-        
+
+def news_agent(symbol, headlines):
+
     prompt = f"""
-    You are a News Sentiment Agent. Analyze the sentiment of these recent headlines for {symbol}:
-    {news_headlines}
-    
-    Determine if the sentiment is Bullish, Bearish, or Neutral, and explain why in 2 sentences.
+    Determine the sentiment for this news about {symbol}:
+
+    {headlines}
+
+    Classify sentiment and explain briefly.
     """
+
     return llm.invoke([HumanMessage(content=prompt)]).content
 
-def supervisor_agent(symbol, price_insight, tech_insight, news_insight):
+
+def supervisor_agent(symbol, price, tech, news):
+
     prompt = f"""
-    You are the Supervisor Agent for a financial research system. 
-    Synthesize the following reports for {symbol} into a single cohesive, professional executive summary (max 4 sentences):
-    
-    1. Price Action: {price_insight}
-    2. Technicals: {tech_insight}
-    3. News Sentiment: {news_insight}
+    Combine these analyses for {symbol}
+
+    Price Analysis:
+    {price}
+
+    Technical Analysis:
+    {tech}
+
+    News Sentiment:
+    {news}
+
+    Give a short executive investment summary.
     """
+
     return llm.invoke([HumanMessage(content=prompt)]).content
+
 
 # -------------------------
 # UI
 # -------------------------
-st.title("Multi-Agent Financial Research AI")
+st.title("📈 Multi-Agent Financial Research AI")
 
-symbol_input = st.text_input("Enter Indian Stock Symbol (e.g., RELIANCE, TCS, INFY)")
+col1, col2 = st.columns(2)
 
-symbol = symbol_input.strip().upper()
+with col1:
+    symbol_input1 = st.text_input("Stock 1 (example RELIANCE)")
 
-if symbol and not symbol.endswith(".NS"):
-    symbol = symbol + ".NS"
+with col2:
+    symbol_input2 = st.text_input("Stock 2 (optional comparison)")
 
-if st.button("Analyze") and symbol:
-    with st.spinner("Agents are gathering and analyzing market data..."):
-        
-        # 1. Fetch Raw Data via Tools
-        stock_info = get_stock_data(symbol)
-        tech_info = get_technical_indicators(symbol)
-        news_headlines = get_latest_news(symbol)
+symbol1 = symbol_input1.strip().upper()
+symbol2 = symbol_input2.strip().upper()
 
-        if not stock_info:
-            st.error("No data found for this symbol. Please check the ticker.")
-        else:
-            # 2. Run Sub-Agents
-            price_insight = stock_data_agent(stock_info)
-            tech_insight = technical_analysis_agent(symbol, tech_info)
-            news_insight = news_sentiment_agent(symbol, news_headlines)
-            
-            # 3. Run Supervisor Agent
-            final_summary = supervisor_agent(symbol, price_insight, tech_insight, news_insight)
+if symbol1 and not symbol1.endswith(".NS"):
+    symbol1 += ".NS"
 
-            # 4. Display Dashboard UI
-            st.success("Analysis Complete!")
-            
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                st.subheader("Price Data")
-                st.write(f"**Price:** ₹{stock_info['current_price']}")
-                st.write(f"**Volume:** {stock_info['volume']}")
-                st.info(price_insight)
-                
-            with col2:
-                st.subheader("Technicals")
-                if tech_info:
-                    st.write(f"**SMA (14):** ₹{tech_info['sma_14']}")
-                    st.write(f"**RSI (14):** {tech_info['rsi_14']}")
-                else:
-                    st.write("Insufficient historical data.")
-                st.info(tech_insight)
-                
-            with col3:
-                st.subheader("Sentiment")
-                st.write("**Latest Headlines:**")
-                st.caption(news_headlines)
-                st.info(news_insight)
+if symbol2 and not symbol2.endswith(".NS"):
+    symbol2 += ".NS"
+
+
+# -------------------------
+# ANALYSIS
+# -------------------------
+if st.button("Analyze") and symbol1:
+
+    with st.spinner("Running AI financial agents..."):
+
+        # STOCK 1 DATA
+        stock1 = get_stock_data(symbol1)
+        tech1 = get_technical_indicators(symbol1)
+        news1 = get_latest_news(symbol1)
+
+        price_insight = stock_data_agent(stock1)
+        tech_insight = technical_agent(symbol1, tech1)
+        news_insight = news_agent(symbol1, news1)
+
+        final_summary = supervisor_agent(
+            symbol1,
+            price_insight,
+            tech_insight,
+            news_insight
+        )
+
+        # -------------------------
+        # DISPLAY STOCK 1
+        # -------------------------
+        st.success("Analysis Complete")
+
+        colA, colB, colC = st.columns(3)
+
+        with colA:
+            st.subheader("Price")
+            st.write(f"₹{stock1['current_price']}")
+            st.write(f"Volume: {stock1['volume']}")
+            st.info(price_insight)
+
+        with colB:
+            st.subheader("Technicals")
+            if tech1:
+                st.write(f"SMA: {tech1['sma']}")
+                st.write(f"RSI: {tech1['rsi']}")
+            st.info(tech_insight)
+
+        with colC:
+            st.subheader("News Sentiment")
+            st.caption(news1)
+            st.info(news_insight)
+
+        st.markdown("---")
+        st.subheader("Supervisor AI Summary")
+        st.write(final_summary)
+
+        # -------------------------
+        # STOCK 1 CHART
+        # -------------------------
+        data = yf.Ticker(symbol1).history(period="30d")
+
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=data.index,
+            y=data["Close"],
+            mode="lines",
+            name=symbol1
+        ))
+
+        st.plotly_chart(fig, use_container_width=True)
+
+        # -------------------------
+        # STOCK COMPARISON
+        # -------------------------
+        if symbol2:
+
+            stock2 = get_stock_data(symbol2)
+            tech2 = get_technical_indicators(symbol2)
 
             st.markdown("---")
-            st.subheader("Supervisor Executive Summary")
-            st.write(final_summary)
+            st.subheader("Stock Comparison")
 
-            # 5. Display Chart
-            st.markdown("---")
-            stock = yf.Ticker(symbol)
-            chart_data = stock.history(period="30d")
-            
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(x=chart_data.index, y=chart_data["Close"], mode="lines", name="Close Price"))
-            fig.update_layout(title=f"{symbol} - Last 30 Days", xaxis_title="Date", yaxis_title="Price (₹)")
-            
-            st.plotly_chart(fig, use_container_width=True)
+            colX, colY = st.columns(2)
+
+            with colX:
+                st.markdown(f"### {symbol1}")
+                st.write(f"Price ₹{stock1['current_price']}")
+                if tech1:
+                    st.write(f"RSI {tech1['rsi']}")
+
+            with colY:
+                st.markdown(f"### {symbol2}")
+                st.write(f"Price ₹{stock2['current_price']}")
+                if tech2:
+                    st.write(f"RSI {tech2['rsi']}")
+
+            # -------------------------
+            # COMPARISON CHART
+            # -------------------------
+            data1 = yf.Ticker(symbol1).history(period="30d")
+            data2 = yf.Ticker(symbol2).history(period="30d")
+
+            fig2 = go.Figure()
+
+            fig2.add_trace(go.Scatter(
+                x=data1.index,
+                y=data1["Close"],
+                mode="lines",
+                name=symbol1
+            ))
+
+            fig2.add_trace(go.Scatter(
+                x=data2.index,
+                y=data2["Close"],
+                mode="lines",
+                name=symbol2
+            ))
+
+            fig2.update_layout(
+                title="Stock Price Comparison",
+                xaxis_title="Date",
+                yaxis_title="Price"
+            )
+
+            st.plotly_chart(fig2, use_container_width=True)
