@@ -28,6 +28,7 @@ llm = ChatGroq(
 # -------------------------
 # DATA FUNCTIONS
 # -------------------------
+@st.cache_data(ttl=600)
 def get_stock_data(symbol):
 
     stock = yf.Ticker(symbol)
@@ -43,7 +44,7 @@ def get_stock_data(symbol):
         "volume": int(data["Volume"].iloc[-1])
     }
 
-
+@st.cache_data(ttl=600)
 def get_technical_indicators(symbol):
 
     stock = yf.Ticker(symbol)
@@ -70,6 +71,7 @@ def get_technical_indicators(symbol):
     }
 
 
+@st.cache_data(ttl=600)
 def get_latest_news(symbol):
 
     if not NEWS_API_KEY:
@@ -90,7 +92,12 @@ def get_latest_news(symbol):
 
     except:
         return "News fetch error"
-
+        
+@st.cache_data(ttl=600)
+def get_chart_data(symbol):
+    stock = yf.Ticker(symbol)
+    data = stock.history(period="30d")
+    return data
 
 # -------------------------
 # AGENTS
@@ -164,11 +171,55 @@ def supervisor_agent(symbol, price, tech, news):
 
     return llm.invoke([HumanMessage(content=prompt)]).content
 
+def bull_agent(symbol, summary):
+
+    prompt = f"""
+    You are a bullish financial analyst.
+
+    Based on this analysis of {symbol}:
+
+    {summary}
+
+    Explain why this stock might be a good investment.
+    """
+
+    return llm.invoke([HumanMessage(content=prompt)]).content
+
+def bear_agent(symbol, summary):
+
+    prompt = f"""
+    You are a bearish financial analyst.
+
+    Based on this analysis of {symbol}:
+
+    {summary}
+
+    Explain the risks or why investors should be cautious.
+    """
+
+    return llm.invoke([HumanMessage(content=prompt)]).content
+
+def judge_agent(symbol, bull, bear):
+
+    prompt = f"""
+    You are a neutral financial judge.
+
+    Bullish argument:
+    {bull}
+
+    Bearish argument:
+    {bear}
+
+    Provide a balanced final investment opinion.
+    """
+
+    return llm.invoke([HumanMessage(content=prompt)]).content
+
 
 # -------------------------
 # UI
 # -------------------------
-st.title("📈 Multi-Agent Financial Research AI")
+st.title(" Multi-Agent Financial Research AI")
 
 col1, col2 = st.columns(2)
 
@@ -210,6 +261,20 @@ if st.button("Analyze") and symbol1:
             tech_insight,
             news_insight
         )
+        bull_view = bull_agent(symbol1, final_summary)
+        bear_view = bear_agent(symbol1, final_summary)
+        judge_view = judge_agent(symbol1, bull_view, bear_view)
+        st.markdown("---")
+        st.subheader("AI Investment Debate")
+
+        st.markdown("**Bull Perspective**")
+        st.write(bull_view)
+
+        st.markdown("**Bear Perspective**")
+        st.write(bear_view)
+ 
+        st.markdown("**Final AI Verdict**")
+        st.write(judge_view)
 
         # -------------------------
         # DISPLAY STOCK 1
@@ -243,7 +308,7 @@ if st.button("Analyze") and symbol1:
         # -------------------------
         # STOCK 1 CHART
         # -------------------------
-        data = yf.Ticker(symbol1).history(period="30d")
+       data = get_chart_data(symbol1)
 
         fig = go.Figure()
         fig.add_trace(go.Scatter(
@@ -283,8 +348,8 @@ if st.button("Analyze") and symbol1:
             # -------------------------
             # COMPARISON CHART
             # -------------------------
-            data1 = yf.Ticker(symbol1).history(period="30d")
-            data2 = yf.Ticker(symbol2).history(period="30d")
+            data1 = get_chart_data(symbol1)
+            data2 = get_chart_data(symbol2)
 
             fig2 = go.Figure()
 
