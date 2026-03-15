@@ -11,7 +11,7 @@ import os
 # -------------------------
 st.set_page_config(
     page_title="AI Financial Research Agent",
-    page_icon="📈",
+   
     layout="wide"
 )
 
@@ -229,7 +229,7 @@ def judge_agent(symbol, bull, bear):
 # -------------------------
 # UI
 # -------------------------
-st.title("📈 Multi-Agent Financial Research AI")
+st.title(" Multi-Agent Financial Research AI")
 st.markdown("""
 ### AI Financial Intelligence Dashboard
 
