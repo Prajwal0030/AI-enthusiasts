@@ -113,18 +113,73 @@ Expanded the system into a **multi-agent financial analysis platform** by introd
 The application now provides a comprehensive analysis combining **market data, technical indicators, and news sentiment**.
 
 ---
+Week 3 Implementation
 
-# Future Roadmap
+In Week 3, the project was expanded into a multi-agent financial analysis platform with advanced AI reasoning and comparison capabilities.
 
-Upcoming improvements include:
+New features added include:
 
-- Multi-agent investment debate system
-- Portfolio risk exposure analysis
-- Market regime detection
-- Portfolio optimization agents
-- Advanced multi-agent orchestration
+Multi-Agent Investment Debate
 
----
+The system now includes three additional AI agents:
+
+Bull Agent – presents the positive investment argument
+
+Bear Agent – highlights potential risks
+
+Judge Agent – synthesizes both perspectives to provide a balanced conclusion
+
+This creates a multi-agent financial reasoning system that simulates real-world investment analysis.
+
+Stock Comparison System
+
+Users can now analyze two stocks simultaneously, allowing comparison of:
+
+Price levels
+
+Technical indicators
+
+Historical price movement
+
+An interactive chart visualizes both stock performances side-by-side.
+
+Dashboard UI Upgrade
+
+The Streamlit interface was upgraded into a tab-based financial dashboard, including:
+
+Market Dashboard
+
+AI Research Summary
+
+Investment Debate
+
+Stock Comparison
+
+This design improves usability and organizes the financial insights into clear sections.
+
+Performance Optimization
+
+To improve performance and prevent API rate limits, data caching was implemented using Streamlit’s caching mechanism.
+
+Current System Architecture
+
+User Input
+↓
+Stock Data Tool (Yahoo Finance API)
+↓
+Technical Indicator Tool (SMA, RSI)
+↓
+News Sentiment Tool (News API)
+↓
+AI Analysis Agents
+↓
+Supervisor Agent
+↓
+Bull Agent vs Bear Agent
+↓
+Judge Agent Final Verdict
+↓
+Streamlit Dashboard
 
 # Deployment
 
