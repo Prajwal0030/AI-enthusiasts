@@ -308,7 +308,7 @@ if st.button("Analyze") and symbol1:
         # -------------------------
         # STOCK 1 CHART
         # -------------------------
-       data = get_chart_data(symbol1)
+       data = get_chart_data(symbol1):
 
         fig = go.Figure()
         fig.add_trace(go.Scatter(
