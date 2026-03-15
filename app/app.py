@@ -7,6 +7,15 @@ from langchain_core.messages import HumanMessage
 import os
 
 # -------------------------
+# PAGE CONFIG
+# -------------------------
+st.set_page_config(
+    page_title="AI Financial Research Agent",
+    page_icon="📈",
+    layout="wide"
+)
+
+# -------------------------
 # API KEYS
 # -------------------------
 GROQ_API_KEY = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
@@ -43,6 +52,7 @@ def get_stock_data(symbol):
         "avg_price": round(data["Close"].mean(), 2),
         "volume": int(data["Volume"].iloc[-1])
     }
+
 
 @st.cache_data(ttl=600)
 def get_technical_indicators(symbol):
@@ -92,12 +102,14 @@ def get_latest_news(symbol):
 
     except:
         return "News fetch error"
-        
+
+
 @st.cache_data(ttl=600)
 def get_chart_data(symbol):
     stock = yf.Ticker(symbol)
     data = stock.history(period="30d")
     return data
+
 
 # -------------------------
 # AGENTS
@@ -105,15 +117,13 @@ def get_chart_data(symbol):
 def stock_data_agent(stock_info):
 
     prompt = f"""
-    You are a financial analyst.
-
     Interpret this stock data:
 
     Price: ₹{stock_info['current_price']}
     Avg Price: ₹{stock_info['avg_price']}
     Volume: {stock_info['volume']}
 
-    Give a short interpretation.
+    Provide a short insight.
     """
 
     return llm.invoke([HumanMessage(content=prompt)]).content
@@ -125,7 +135,7 @@ def technical_agent(symbol, tech):
         return "Not enough data for indicators."
 
     prompt = f"""
-    Analyze the technical indicators:
+    Analyze these indicators:
 
     SMA: {tech['sma']}
     RSI: {tech['rsi']}
@@ -133,7 +143,7 @@ def technical_agent(symbol, tech):
     RSI>70 overbought
     RSI<30 oversold
 
-    Give a short analysis.
+    Provide a short technical insight.
     """
 
     return llm.invoke([HumanMessage(content=prompt)]).content
@@ -142,11 +152,11 @@ def technical_agent(symbol, tech):
 def news_agent(symbol, headlines):
 
     prompt = f"""
-    Determine the sentiment for this news about {symbol}:
+    Analyze the sentiment of these headlines for {symbol}:
 
     {headlines}
 
-    Classify sentiment and explain briefly.
+    Classify sentiment and briefly explain.
     """
 
     return llm.invoke([HumanMessage(content=prompt)]).content
@@ -157,60 +167,60 @@ def supervisor_agent(symbol, price, tech, news):
     prompt = f"""
     Combine these analyses for {symbol}
 
-    Price Analysis:
+    Price:
     {price}
 
-    Technical Analysis:
+    Technical:
     {tech}
 
-    News Sentiment:
+    News:
     {news}
 
-    Give a short executive investment summary.
+    Produce a short executive investment summary.
     """
 
     return llm.invoke([HumanMessage(content=prompt)]).content
 
+
+# -------------------------
+# DEBATE AGENTS
+# -------------------------
 def bull_agent(symbol, summary):
 
     prompt = f"""
-    You are a bullish financial analyst.
-
     Based on this analysis of {symbol}:
 
     {summary}
 
-    Explain why this stock might be a good investment.
+    Explain why the stock could be a good investment.
     """
 
     return llm.invoke([HumanMessage(content=prompt)]).content
+
 
 def bear_agent(symbol, summary):
 
     prompt = f"""
-    You are a bearish financial analyst.
-
     Based on this analysis of {symbol}:
 
     {summary}
 
-    Explain the risks or why investors should be cautious.
+    Explain the risks investors should consider.
     """
 
     return llm.invoke([HumanMessage(content=prompt)]).content
 
+
 def judge_agent(symbol, bull, bear):
 
     prompt = f"""
-    You are a neutral financial judge.
-
     Bullish argument:
     {bull}
 
     Bearish argument:
     {bear}
 
-    Provide a balanced final investment opinion.
+    Provide a balanced investment verdict.
     """
 
     return llm.invoke([HumanMessage(content=prompt)]).content
@@ -219,7 +229,18 @@ def judge_agent(symbol, bull, bear):
 # -------------------------
 # UI
 # -------------------------
-st.title(" Multi-Agent Financial Research AI")
+st.title("📈 Multi-Agent Financial Research AI")
+st.markdown("""
+### AI Financial Intelligence Dashboard
+
+Analyze stocks using **AI agents** that combine:
+- Market data
+- Technical indicators
+- News sentiment
+- Multi-agent reasoning
+
+Enter a stock ticker below to begin analysis.
+""")
 
 col1, col2 = st.columns(2)
 
@@ -228,6 +249,7 @@ with col1:
 
 with col2:
     symbol_input2 = st.text_input("Stock 2 (optional comparison)")
+
 
 symbol1 = symbol_input1.strip().upper()
 symbol2 = symbol_input2.strip().upper()
@@ -246,7 +268,6 @@ if st.button("Analyze") and symbol1:
 
     with st.spinner("Running AI financial agents..."):
 
-        # STOCK 1 DATA
         stock1 = get_stock_data(symbol1)
         tech1 = get_technical_indicators(symbol1)
         news1 = get_latest_news(symbol1)
@@ -261,116 +282,163 @@ if st.button("Analyze") and symbol1:
             tech_insight,
             news_insight
         )
+
         bull_view = bull_agent(symbol1, final_summary)
         bear_view = bear_agent(symbol1, final_summary)
         judge_view = judge_agent(symbol1, bull_view, bear_view)
-        st.markdown("---")
-        st.subheader("AI Investment Debate")
 
-        st.markdown("**Bull Perspective**")
-        st.write(bull_view)
-
-        st.markdown("**Bear Perspective**")
-        st.write(bear_view)
- 
-        st.markdown("**Final AI Verdict**")
-        st.write(judge_view)
-
-        # -------------------------
-        # DISPLAY STOCK 1
-        # -------------------------
         st.success("Analysis Complete")
 
-        colA, colB, colC = st.columns(3)
-
-        with colA:
-            st.subheader("Price")
-            st.write(f"₹{stock1['current_price']}")
-            st.write(f"Volume: {stock1['volume']}")
-            st.info(price_insight)
-
-        with colB:
-            st.subheader("Technicals")
-            if tech1:
-                st.write(f"SMA: {tech1['sma']}")
-                st.write(f"RSI: {tech1['rsi']}")
-            st.info(tech_insight)
-
-        with colC:
-            st.subheader("News Sentiment")
-            st.caption(news1)
-            st.info(news_insight)
-
-        st.markdown("---")
-        st.subheader("Supervisor AI Summary")
-        st.write(final_summary)
+        # -------------------------
+        # DASHBOARD TABS
+        # -------------------------
+        tab1, tab2, tab3, tab4 = st.tabs([
+               "Market Dashboard",
+               "AI Research Summary",
+               "Investment Debate",
+               "Stock Comparison"])
+    
 
         # -------------------------
-        # STOCK 1 CHART
+        # TAB 1
         # -------------------------
-        data = get_chart_data(symbol1)
+        with tab1:
+            st.markdown("### Key Market Metrics")
 
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=data.index,
-            y=data["Close"],
-            mode="lines",
-            name=symbol1
-        ))
+            colA, colB, colC = st.columns(3)
 
-        st.plotly_chart(fig, use_container_width=True)
+            with colA:
+                st.divider()
+                st.subheader("Technical Indicators")
+                st.subheader("Price")
+                st.metric(
+                label="Current Price",
+                value=f"₹{stock1['current_price']}",
+                delta=f"{round(stock1['current_price'] - stock1['avg_price'],2)} vs avg")
 
-        # -------------------------
-        # STOCK COMPARISON
-        # -------------------------
-        if symbol2:
+                st.metric("Volume", stock1["volume"])
+                st.info(price_insight)
 
-            stock2 = get_stock_data(symbol2)
-            tech2 = get_technical_indicators(symbol2)
-
-            st.markdown("---")
-            st.subheader("Stock Comparison")
-
-            colX, colY = st.columns(2)
-
-            with colX:
-                st.markdown(f"### {symbol1}")
-                st.write(f"Price ₹{stock1['current_price']}")
+            with colB:
+                st.divider()
+                st.subheader("Technical Indicators")
                 if tech1:
-                    st.write(f"RSI {tech1['rsi']}")
+                    st.metric("SMA", tech1["sma"])
+                    st.metric("RSI", tech1["rsi"])
+                st.info(tech_insight)
 
-            with colY:
-                st.markdown(f"### {symbol2}")
-                st.write(f"Price ₹{stock2['current_price']}")
-                if tech2:
-                    st.write(f"RSI {tech2['rsi']}")
+            with colC:
+                st.divider()
+                st.subheader("News Sentiment")
+                st.caption(news1)
+                st.info(news_insight)
 
-            # -------------------------
-            # COMPARISON CHART
-            # -------------------------
-            data1 = get_chart_data(symbol1)
-            data2 = get_chart_data(symbol2)
+            data = get_chart_data(symbol1)
 
-            fig2 = go.Figure()
-
-            fig2.add_trace(go.Scatter(
-                x=data1.index,
-                y=data1["Close"],
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=data.index,
+                y=data["Close"],
                 mode="lines",
                 name=symbol1
             ))
 
-            fig2.add_trace(go.Scatter(
-                x=data2.index,
-                y=data2["Close"],
-                mode="lines",
-                name=symbol2
-            ))
+            st.plotly_chart(fig, use_container_width=True)
 
-            fig2.update_layout(
-                title="Stock Price Comparison",
-                xaxis_title="Date",
-                yaxis_title="Price"
-            )
+        # -------------------------
+        # TAB 2
+        # -------------------------
+        with tab2:
+            st.divider()
 
-            st.plotly_chart(fig2, use_container_width=True)
+            st.subheader("AI Executive Summary")
+
+            st.success(final_summary)
+
+        # -------------------------
+        # TAB 3
+        # -------------------------
+        with tab3:
+            st.divider()
+
+            st.subheader("AI Investment Debate")
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.divider()
+                st.markdown("### Bull Perspective")
+                st.write(bull_view)
+
+            with col2:
+                st.divider()
+                st.markdown("### Bear Perspective")
+                st.write(bear_view)
+
+            st.markdown("---")
+
+            st.markdown("### Final AI Verdict")
+
+            st.success(judge_view)
+
+        # -------------------------
+        # TAB 4
+        # -------------------------
+        with tab4:
+            st.divider()
+
+            if symbol2:
+
+                stock2 = get_stock_data(symbol2)
+                tech2 = get_technical_indicators(symbol2)
+
+                colX, colY = st.columns(2)
+
+                with colX:
+                    st.divider()
+                    st.markdown(f"### {symbol1}")
+                    st.metric("Price", f"₹{stock1['current_price']}")
+                    if tech1:
+                        st.metric("RSI", tech1["rsi"])
+
+                with colY:
+                    st.divider()
+                    st.markdown(f"### {symbol2}")
+                    st.metric("Price", f"₹{stock2['current_price']}")
+                    if tech2:
+                        st.metric("RSI", tech2["rsi"])
+
+                data1 = get_chart_data(symbol1)
+                data2 = get_chart_data(symbol2)
+
+                fig2 = go.Figure()
+
+                fig2.add_trace(go.Scatter(
+                    x=data1.index,
+                    y=data1["Close"],
+                    mode="lines",
+                    name=symbol1
+                ))
+
+                fig2.add_trace(go.Scatter(
+                    x=data2.index,
+                    y=data2["Close"],
+                    mode="lines",
+                    name=symbol2
+                ))
+
+                fig2.update_layout(
+                    title="Stock Price Comparison",
+                    xaxis_title="Date",
+                    yaxis_title="Price"
+                )
+
+                st.plotly_chart(fig2, use_container_width=True)
+
+            else:
+                st.info("Enter a second stock to enable comparison.")
+
+st.markdown("---")
+st.caption(
+    "AI Financial Research Assistant • Built with Streamlit, LangChain, Groq LLM, and Financial Data APIs"
+)
