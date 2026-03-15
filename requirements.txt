@@ -3,6 +3,7 @@ plotly
 yfinance
 pandas
 requests
+
 langchain==0.2.16
 langchain-core==0.2.40
 langchain-community==0.2.16
