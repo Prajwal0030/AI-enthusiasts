@@ -188,7 +188,7 @@ def calculate_risk_score(tech):
 # -------------------------
 # UI
 # -------------------------
-st.title("📈 AI Financial Research Platform")
+st.title("AI Financial Research Platform")
 
 col1, col2 = st.columns(2)
 
@@ -285,7 +285,7 @@ if st.button("Analyze") and symbol1:
     with tabs[6]:
         st.write(macro_agent())
 
-    st.subheader("📌 Investment Signal")
+    st.subheader(" Investment Signal")
 
     col1, col2 = st.columns(2)
 
