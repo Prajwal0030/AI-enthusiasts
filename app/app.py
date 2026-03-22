@@ -7,10 +7,13 @@ from langchain_core.messages import HumanMessage
 import os
 
 # -------------------------
-# CONFIG
+# PAGE CONFIG
 # -------------------------
 st.set_page_config(page_title="AI Financial Research", layout="wide")
 
+# -------------------------
+# API KEYS
+# -------------------------
 GROQ_API_KEY = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY") or st.secrets.get("NEWS_API_KEY")
 
@@ -18,17 +21,26 @@ if not GROQ_API_KEY:
     st.error("Missing GROQ API key")
     st.stop()
 
+# -------------------------
+# LLM
+# -------------------------
 llm = ChatGroq(
     model="llama-3.1-8b-instant",
-    temperature=0
+    temperature=0,
+    groq_api_key=GROQ_API_KEY
 )
 
 # -------------------------
-# DATA
+# DATA FUNCTIONS
 # -------------------------
 @st.cache_data(ttl=600)
-def get_stock(symbol):
-    data = yf.Ticker(symbol).history(period="7d")
+def get_stock_data(symbol):
+    stock = yf.Ticker(symbol)
+    data = stock.history(period="7d")
+
+    if data.empty:
+        return None
+
     return {
         "price": round(data["Close"].iloc[-1], 2),
         "avg": round(data["Close"].mean(), 2),
@@ -36,12 +48,20 @@ def get_stock(symbol):
     }
 
 @st.cache_data(ttl=600)
-def get_indicators(symbol):
-    data = yf.Ticker(symbol).history(period="1mo")
+def get_technical_indicators(symbol):
+    stock = yf.Ticker(symbol)
+    data = stock.history(period="1mo")
 
+    if len(data) < 20:
+        return None
+
+    # SMA
     data["SMA"] = data["Close"].rolling(14).mean()
+
+    # EMA (NEW)
     data["EMA"] = data["Close"].ewm(span=14).mean()
 
+    # RSI
     delta = data["Close"].diff()
     gain = delta.clip(lower=0)
     loss = -delta.clip(upper=0)
@@ -57,7 +77,7 @@ def get_indicators(symbol):
 @st.cache_data(ttl=600)
 def get_news(symbol):
     if not NEWS_API_KEY:
-        return "No news"
+        return "No news API"
 
     query = symbol.replace(".NS", "")
     url = f"https://newsapi.org/v2/everything?q={query}&pageSize=3&apiKey={NEWS_API_KEY}"
@@ -65,42 +85,63 @@ def get_news(symbol):
     try:
         res = requests.get(url).json()
         headlines = [a["title"] for a in res.get("articles", [])]
-        return "\n".join(headlines[:3])
+        return "\n".join(headlines) if headlines else "No news"
     except:
-        return "News unavailable"
+        return "Error fetching news"
 
 @st.cache_data(ttl=600)
 def get_chart(symbol):
     return yf.Ticker(symbol).history(period="30d")
 
 # -------------------------
-# AGENTS (SHORT OUTPUTS)
+# AGENTS
 # -------------------------
-def llm_call(prompt):
+def stock_agent(data):
+    return llm.invoke([HumanMessage(content=f"Analyze stock price {data}")]).content
+
+def tech_agent(data):
+    return llm.invoke([HumanMessage(content=f"Analyze indicators {data}")]).content
+
+def news_agent(data):
+    return llm.invoke([HumanMessage(content=f"Analyze sentiment {data}")]).content
+
+def supervisor(symbol, p, t, n):
+    return llm.invoke([HumanMessage(content=f"{symbol} analysis:\n{p}\n{t}\n{n}")]).content
+
+# -------------------------
+# DEBATE AGENTS
+# -------------------------
+def bull(symbol, summary):
+    return llm.invoke([HumanMessage(content=f"Bull case for {symbol}: {summary}")]).content
+
+def bear(symbol, summary):
+    return llm.invoke([HumanMessage(content=f"Bear case for {symbol}: {summary}")]).content
+
+def judge(symbol, b, br):
+    return llm.invoke([HumanMessage(content=f"Judge: {b} vs {br}")]).content
+
+# -------------------------
+# PORTFOLIO AGENT (NEW)
+# -------------------------
+def portfolio_agent(symbols, data):
+    prompt = f"""
+    Analyze this portfolio:
+    Stocks: {symbols}
+    Data: {data}
+
+    Evaluate diversification, risk, and suggestions.
+    """
     return llm.invoke([HumanMessage(content=prompt)]).content
 
-def summary_agent(symbol, data, tech, news):
-    return llm_call(f"""
-    Give a short financial summary (max 3 lines):
-    Price: {data}
-    Indicators: {tech}
-    News: {news}
-    """)
-
-def bull_agent(symbol, summary):
-    return llm_call(f"Give 2-line bullish view for {symbol}: {summary}")
-
-def bear_agent(symbol, summary):
-    return llm_call(f"Give 2-line bearish risks for {symbol}: {summary}")
-
-def judge_agent(bull, bear):
-    return llm_call(f"Give final verdict in 2 lines:\nBull: {bull}\nBear: {bear}")
-
-def portfolio_agent(data):
-    return llm_call(f"Analyze portfolio in 3 lines: {data}")
-
+# -------------------------
+# ECONOMIC AGENT (NEW)
+# -------------------------
 def macro_agent():
-    return llm_call("Give current market outlook in 3 short lines")
+    prompt = """
+    Explain current market conditions including inflation, interest rates,
+    and overall market trend in simple terms.
+    """
+    return llm.invoke([HumanMessage(content=prompt)]).content
 
 # -------------------------
 # UI
@@ -109,7 +150,8 @@ st.title("📈 AI Financial Research Platform")
 
 col1, col2 = st.columns(2)
 symbol1 = col1.text_input("Stock 1")
-symbol2 = col2.text_input("Stock 2 (optional)")
+symbol2 = col2.text_input("Stock 2")
+
 portfolio_input = st.text_input("Portfolio (comma separated)")
 
 if st.button("Analyze") and symbol1:
@@ -117,62 +159,68 @@ if st.button("Analyze") and symbol1:
     symbol1 += ".NS" if ".NS" not in symbol1 else ""
     symbol2 += ".NS" if symbol2 and ".NS" not in symbol2 else ""
 
-    data = get_stock(symbol1)
-    tech = get_indicators(symbol1)
-    news = get_news(symbol1)
+    stock1 = get_stock_data(symbol1)
+    tech1 = get_technical_indicators(symbol1)
+    news1 = get_news(symbol1)
 
-    summary = summary_agent(symbol1, data, tech, news)
-    bull = bull_agent(symbol1, summary)
-    bear = bear_agent(symbol1, summary)
-    verdict = judge_agent(bull, bear)
+    p = stock_agent(stock1)
+    t = tech_agent(tech1)
+    n = news_agent(news1)
 
+    summary = supervisor(symbol1, p, t, n)
+
+    bull_view = bull(symbol1, summary)
+    bear_view = bear(symbol1, summary)
+    judge_view = judge(symbol1, bull_view, bear_view)
+
+    # TABS
     tabs = st.tabs([
-        "Dashboard",
-        "AI Summary",
+        "Market Dashboard",
+        "Summary",
         "Debate",
         "Comparison",
-        "Portfolio",
-        "Indicators",
-        "Macro"
+        "Portfolio AI",
+        "Advanced Indicators",
+        "Economic Context"
     ])
 
     # -------------------------
-    # DASHBOARD
+    # MARKET DASHBOARD
     # -------------------------
     with tabs[0]:
-        st.metric("Price", data["price"])
-        st.metric("Volume", data["volume"])
+        st.metric("Price", stock1["price"])
+        st.metric("Volume", stock1["volume"])
 
-        chart = get_chart(symbol1)
+        data = get_chart(symbol1)
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=chart.index, y=chart["Close"]))
+        fig.add_trace(go.Scatter(x=data.index, y=data["Close"]))
         st.plotly_chart(fig)
 
     # -------------------------
     # SUMMARY
     # -------------------------
     with tabs[1]:
-        st.write(summary)
+        st.success(summary)
 
     # -------------------------
     # DEBATE
     # -------------------------
     with tabs[2]:
-        st.write("Bull:", bull)
-        st.write("Bear:", bear)
-        st.success("Final Verdict: " + verdict)
+        st.write("Bull:", bull_view)
+        st.write("Bear:", bear_view)
+        st.success(judge_view)
 
     # -------------------------
     # COMPARISON
     # -------------------------
     with tabs[3]:
         if symbol2:
-            d1 = get_chart(symbol1)
-            d2 = get_chart(symbol2)
+            data1 = get_chart(symbol1)
+            data2 = get_chart(symbol2)
 
             fig = go.Figure()
-            fig.add_trace(go.Scatter(x=d1.index, y=d1["Close"], name=symbol1))
-            fig.add_trace(go.Scatter(x=d2.index, y=d2["Close"], name=symbol2))
+            fig.add_trace(go.Scatter(x=data1.index, y=data1["Close"], name=symbol1))
+            fig.add_trace(go.Scatter(x=data2.index, y=data2["Close"], name=symbol2))
             st.plotly_chart(fig)
 
     # -------------------------
@@ -181,19 +229,25 @@ if st.button("Analyze") and symbol1:
     with tabs[4]:
         if portfolio_input:
             symbols = [s.strip().upper()+".NS" for s in portfolio_input.split(",")]
-            pdata = [get_stock(s) for s in symbols]
-            st.write(portfolio_agent(pdata))
+
+            portfolio_data = []
+            for s in symbols:
+                d = get_stock_data(s)
+                if d:
+                    portfolio_data.append(d)
+
+            st.write(portfolio_agent(symbols, portfolio_data))
 
     # -------------------------
-    # INDICATORS (UPGRADED)
+    # ADVANCED INDICATORS
     # -------------------------
     with tabs[5]:
-        st.write(f"**SMA ({tech['sma']})** → Trend direction (stable average)")
-        st.write(f"**EMA ({tech['ema']})** → Faster reaction to price changes")
-        st.write(f"**RSI ({tech['rsi']})** → Momentum (overbought >70, oversold <30)")
+        st.write("SMA:", tech1["sma"])
+        st.write("EMA:", tech1["ema"])
+        st.write("RSI:", tech1["rsi"])
 
     # -------------------------
-    # MACRO
+    # ECONOMIC CONTEXT
     # -------------------------
     with tabs[6]:
         st.write(macro_agent())
