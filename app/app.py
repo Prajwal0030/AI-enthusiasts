@@ -18,10 +18,7 @@ if not GROQ_API_KEY:
     st.error("Missing GROQ API Key")
     st.stop()
 
-llm = ChatGroq(
-    model="llama-3.1-8b-instant",
-    temperature=0
-)
+llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0)
 
 # -------------------------
 # DATA FUNCTIONS
@@ -31,7 +28,6 @@ def get_stock_data(symbol):
     data = yf.Ticker(symbol).history(period="7d")
     if data.empty:
         return None
-
     return {
         "price": round(data["Close"].iloc[-1], 2),
         "avg": round(data["Close"].mean(), 2),
@@ -41,9 +37,6 @@ def get_stock_data(symbol):
 @st.cache_data(ttl=600)
 def get_technical_indicators(symbol):
     data = yf.Ticker(symbol).history(period="1mo")
-
-    if len(data) < 20:
-        return None
 
     data["SMA"] = data["Close"].rolling(14).mean()
     data["EMA"] = data["Close"].ewm(span=14).mean()
@@ -71,7 +64,7 @@ def get_news(symbol):
     try:
         res = requests.get(url).json()
         headlines = [a["title"] for a in res.get("articles", [])]
-        return "\n".join(headlines[:3]) if headlines else "No recent news"
+        return "\n".join(headlines[:3])
     except:
         return "Error fetching news"
 
@@ -80,42 +73,84 @@ def get_chart(symbol):
     return yf.Ticker(symbol).history(period="30d")
 
 # -------------------------
-# AGENTS
+# AGENTS (DETAILED OUTPUT)
 # -------------------------
 def llm_call(prompt):
     return llm.invoke([HumanMessage(content=prompt)]).content
 
 def summary_agent(symbol, stock, tech, news):
     return llm_call(f"""
-    Give a concise financial summary (max 3 lines):
+    Perform a detailed financial analysis for {symbol}.
 
+    Include:
+    1. Market Position
+    2. Technical Trend Analysis
+    3. Volume Interpretation
+    4. News Impact
+    5. Final Recommendation (Buy/Hold/Sell)
+
+    Data:
     Price: {stock}
     Indicators: {tech}
     News: {news}
     """)
 
 def bull_agent(symbol, summary):
-    return llm_call(f"Give 2-line bullish view for {symbol}: {summary}")
+    return llm_call(f"""
+    Provide a strong bullish case for {symbol}.
+    Include growth potential, strengths, and upside.
+    Keep it structured.
+    """)
 
 def bear_agent(symbol, summary):
-    return llm_call(f"Give 2-line risks for {symbol}: {summary}")
+    return llm_call(f"""
+    Provide a bearish analysis for {symbol}.
+    Include risks, weaknesses, and downside.
+    Keep it structured.
+    """)
 
 def judge_agent(bull, bear):
-    return llm_call(f"Give final decision in 2 lines:\nBull: {bull}\nBear: {bear}")
+    return llm_call(f"""
+    Compare the bullish and bearish views.
+
+    Give:
+    - Final balanced conclusion
+    - Clear investment stance (Buy/Hold/Sell)
+    """)
 
 def portfolio_agent(data):
-    return llm_call(f"Analyze portfolio in 3 short lines: {data}")
+    return llm_call(f"""
+    Analyze this portfolio:
+
+    {data}
+
+    Include:
+    - Diversification
+    - Risk level
+    - Strengths
+    - Weaknesses
+    - Suggestions
+    """)
 
 def macro_agent():
-    return llm_call("Give current market outlook in 3 short lines")
+    return llm_call("""
+    Explain current market conditions:
+
+    - Inflation
+    - Interest rates
+    - Market sentiment
+    - Investment outlook
+    """)
 
 def indicator_agent(tech):
     return llm_call(f"""
-    Explain briefly what these indicators suggest (max 3 lines):
+    Explain these indicators:
 
     SMA: {tech['sma']}
     EMA: {tech['ema']}
     RSI: {tech['rsi']}
+
+    Include what they imply for trading decisions.
     """)
 
 # -------------------------
@@ -125,14 +160,10 @@ st.title("📈 AI Financial Research Platform")
 
 col1, col2 = st.columns(2)
 
-symbol1 = col1.text_input("Stock 1 (e.g., RELIANCE)")
+symbol1 = col1.text_input("Stock 1")
 symbol2 = col2.text_input("Stock 2 (optional)")
+portfolio_input = st.text_input("Portfolio (comma separated)")
 
-portfolio_input = st.text_input("Portfolio (comma separated stocks)")
-
-# -------------------------
-# MAIN
-# -------------------------
 if st.button("Analyze") and symbol1:
 
     symbol1 = symbol1.strip().upper()
@@ -147,10 +178,6 @@ if st.button("Analyze") and symbol1:
     stock = get_stock_data(symbol1)
     tech = get_technical_indicators(symbol1)
     news = get_news(symbol1)
-
-    if not stock:
-        st.error("Invalid stock symbol")
-        st.stop()
 
     summary = summary_agent(symbol1, stock, tech, news)
     bull = bull_agent(symbol1, summary)
@@ -169,64 +196,54 @@ if st.button("Analyze") and symbol1:
 
     # Dashboard
     with tabs[0]:
-        colA, colB = st.columns(2)
-        colA.metric("Price", stock["price"])
-        colB.metric("Volume", stock["volume"])
+        st.metric("Price", stock["price"])
+        st.metric("Volume", stock["volume"])
 
         chart = get_chart(symbol1)
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=chart.index, y=chart["Close"], name="Price"))
-        st.plotly_chart(fig, use_container_width=True)
+        fig.add_trace(go.Scatter(x=chart.index, y=chart["Close"]))
+        st.plotly_chart(fig)
 
-    # Summary (CLEANED)
+    # Summary
     with tabs[1]:
         st.write(summary)
 
     # Debate
     with tabs[2]:
-        st.write("Bull:", bull)
-        st.write("Bear:", bear)
-        st.success("Final Verdict: " + verdict)
+        st.subheader("Bullish View")
+        st.write(bull)
+
+        st.subheader("Bearish View")
+        st.write(bear)
+
+        st.subheader("Final Decision")
+        st.success(verdict)
 
     # Comparison
     with tabs[3]:
         if symbol2:
-            data1 = get_chart(symbol1)
-            data2 = get_chart(symbol2)
+            d1 = get_chart(symbol1)
+            d2 = get_chart(symbol2)
 
             fig = go.Figure()
-            fig.add_trace(go.Scatter(x=data1.index, y=data1["Close"], name=symbol1))
-            fig.add_trace(go.Scatter(x=data2.index, y=data2["Close"], name=symbol2))
+            fig.add_trace(go.Scatter(x=d1.index, y=d1["Close"], name=symbol1))
+            fig.add_trace(go.Scatter(x=d2.index, y=d2["Close"], name=symbol2))
+            st.plotly_chart(fig)
 
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("Enter second stock")
-
-    # Portfolio AI (CLEANED)
+    # Portfolio
     with tabs[4]:
         if portfolio_input:
-            symbols = [s.strip().upper() + ".NS" for s in portfolio_input.split(",")]
+            symbols = [s.strip().upper()+".NS" for s in portfolio_input.split(",")]
             pdata = [get_stock_data(s) for s in symbols if get_stock_data(s)]
             st.write(portfolio_agent(pdata))
-        else:
-            st.info("Enter portfolio stocks")
 
     # Indicators
     with tabs[5]:
-        st.subheader("Technical Indicators")
+        st.metric("SMA", tech['sma'])
+        st.metric("EMA", tech['ema'])
+        st.metric("RSI", tech['rsi'])
 
-        col1, col2, col3 = st.columns(3)
-        col1.metric("SMA", tech['sma'])
-        col2.metric("EMA", tech['ema'])
-        col3.metric("RSI", tech['rsi'])
-
-        st.markdown("---")
         st.write(indicator_agent(tech))
-
-        if tech['rsi'] > 70:
-            st.warning("Overbought")
-        elif tech['rsi'] < 30:
-            st.success("Oversold")
 
     # Macro
     with tabs[6]:
