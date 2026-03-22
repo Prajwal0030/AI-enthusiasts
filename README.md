@@ -2,60 +2,87 @@
 
 ## Project Vision
 
-This project aims to build a **multi-agent financial research system** that helps analyze stocks using real-time market data, technical indicators, and news sentiment.
+This project aims to build a **multi-agent financial intelligence platform** that assists users in analyzing stocks using real-time market data, technical indicators, and AI-driven insights.
 
-The system is designed as a modular **agent-based architecture** where specialized agents analyze different aspects of financial data and a supervisor agent synthesizes the final insight.
-
-Future agents planned for the system include:
-
-- Stock Analysis Agent
-- Technical Analysis Agent
-- News Sentiment Agent
-- Risk Modeling Agent (future)
-- Portfolio Optimization Agent (future)
-- Supervisor Agent (controls orchestration)
+The system follows a modular **agent-based architecture**, where multiple specialized AI agents collaborate to generate comprehensive financial analysis and investment recommendations.
 
 ---
 
-# Current Features (Week 2)
+# Current Features (Week 4)
 
-The system currently supports:
+### Multi-Agent Financial Analysis
 
-### Stock Data Analysis
-Retrieves real-time Indian stock data using **Yahoo Finance API (yfinance)** including:
+The system includes multiple AI agents:
 
-- Current stock price
-- Average price
-- Trading volume
+- Stock Analysis Agent – interprets price and volume data  
+- Technical Analysis Agent – analyzes SMA, EMA, RSI  
+- News Sentiment Agent – evaluates recent market news  
+- Supervisor Agent – combines all insights into a structured summary  
 
-### Technical Indicators
-Calculates basic technical indicators including:
+---
 
-- 14-day Simple Moving Average (SMA)
-- 14-day Relative Strength Index (RSI)
+### AI Investment Decision System
 
-### News Sentiment Analysis
-Fetches the latest financial news headlines using **News API** and uses an LLM to determine:
+- Generates **Buy / Hold / Sell recommendations**
+- Provides **confidence level**
+- Includes **reasoning based on technical + sentiment analysis**
 
-- Bullish
-- Bearish
-- Neutral sentiment
+---
 
-### Supervisor Agent
-A **Supervisor AI Agent** synthesizes the outputs from:
+### Multi-Agent Debate System
 
-- Stock Data Agent
-- Technical Analysis Agent
-- News Sentiment Agent
+- **Bull Agent** – highlights growth opportunities  
+- **Bear Agent** – identifies risks  
+- **Judge Agent** – gives final balanced decision  
 
-and generates a final **executive financial summary**.
+---
 
-### Interactive Visualization
-The platform also includes:
+### Portfolio AI Analyzer
 
-- 30-day stock price chart
-- Interactive Plotly visualization
-- Streamlit dashboard
+Users can input multiple stocks to get:
+
+- Diversification analysis  
+- Risk evaluation  
+- Strengths and weaknesses  
+- Investment suggestions  
+
+---
+
+### Advanced Technical Indicators
+
+Includes:
+
+- SMA (Trend analysis)  
+- EMA (Short-term trend sensitivity)  
+- RSI (Momentum indicator)  
+
+Also provides **AI-based interpretation** for better decision-making.
+
+---
+
+### Stock Comparison System
+
+- Compare two stocks simultaneously  
+- Visualize performance with interactive charts  
+
+---
+
+### Economic Context Agent
+
+Provides macro-level insights:
+
+- Inflation trends  
+- Interest rates  
+- Market sentiment  
+- Investment outlook  
+
+---
+
+### UI & Performance
+
+- Tab-based dashboard for structured insights  
+- Interactive Plotly charts  
+- Streamlit caching for performance optimization  
 
 ---
 
@@ -63,137 +90,80 @@ The platform also includes:
 
 User Input  
 ↓  
-Stock Data Tool (Yahoo Finance API)  
+Stock Data (Yahoo Finance API)  
 ↓  
-Technical Analysis Tool  
+Technical Indicators + News Data  
 ↓  
-News Retrieval Tool (News API)  
+Multi-Agent Analysis  
 ↓  
-LLM Agents analyze each data source  
+Supervisor + Debate Agents  
 ↓  
-Supervisor Agent synthesizes insights  
+Recommendation System  
 ↓  
-Streamlit Dashboard
+Streamlit Dashboard  
 
 ---
 
 # Tech Stack
 
-- Python
-- Streamlit
-- Plotly
-- yfinance
-- News API
-- LangChain
-- Groq LLM
-- Pandas
+- Python  
+- Streamlit  
+- Plotly  
+- yfinance  
+- News API  
+- LangChain  
+- Groq LLM  
+- Pandas  
 
 ---
 
 # Week 1 Implementation
 
-Implemented:
-
-- Stock data retrieval using yfinance
-- Basic LLM insight generation
-- Streamlit dashboard
-- 30-day price visualization
+- Stock data retrieval  
+- Basic LLM insights  
+- Streamlit dashboard  
 
 ---
 
 # Week 2 Implementation
 
-Expanded the system into a **multi-agent financial analysis platform** by introducing:
-
-- Stock Data Agent
-- Technical Analysis Agent
-- News Sentiment Agent
-- Supervisor Agent for final financial reasoning
-
-The application now provides a comprehensive analysis combining **market data, technical indicators, and news sentiment**.
+- Multi-agent architecture  
+- Technical + sentiment analysis  
+- Supervisor agent  
 
 ---
-Week 3 Implementation
 
-In Week 3, the project was expanded into a multi-agent financial analysis platform with advanced AI reasoning and comparison capabilities.
+# Week 3 Implementation
 
-New features added include:
+- Multi-agent debate system  
+- Stock comparison  
+- UI upgrade  
+- Performance optimization  
 
-Multi-Agent Investment Debate
+---
 
-The system now includes three additional AI agents:
+# Week 4 Implementation
 
-Bull Agent – presents the positive investment argument
+- Investment recommendation system (Buy/Hold/Sell)  
+- Portfolio AI analyzer  
+- Advanced indicators (SMA, EMA, RSI)  
+- Economic context agent  
+- Improved structured AI outputs  
 
-Bear Agent – highlights potential risks
-
-Judge Agent – synthesizes both perspectives to provide a balanced conclusion
-
-This creates a multi-agent financial reasoning system that simulates real-world investment analysis.
-
-Stock Comparison System
-
-Users can now analyze two stocks simultaneously, allowing comparison of:
-
-Price levels
-
-Technical indicators
-
-Historical price movement
-
-An interactive chart visualizes both stock performances side-by-side.
-
-Dashboard UI Upgrade
-
-The Streamlit interface was upgraded into a tab-based financial dashboard, including:
-
-Market Dashboard
-
-AI Research Summary
-
-Investment Debate
-
-Stock Comparison
-
-This design improves usability and organizes the financial insights into clear sections.
-
-Performance Optimization
-
-To improve performance and prevent API rate limits, data caching was implemented using Streamlit’s caching mechanism.
-
-Current System Architecture
-
-User Input
-↓
-Stock Data Tool (Yahoo Finance API)
-↓
-Technical Indicator Tool (SMA, RSI)
-↓
-News Sentiment Tool (News API)
-↓
-AI Analysis Agents
-↓
-Supervisor Agent
-↓
-Bull Agent vs Bear Agent
-↓
-Judge Agent Final Verdict
-↓
-Streamlit Dashboard
+---
 
 # Deployment
 
-The application is deployed using **Streamlit Cloud**.
+Deployed on **Streamlit Cloud**
 
-Users can enter an Indian stock symbol such as:
-RELIANCE
-TCS
-INFY
+Users can analyze stocks like:
 
-and receive a full AI-powered financial analysis.
+RELIANCE  
+TCS  
+INFY  
 
 ---
 
-# Goal of the Project
+# Goal
 
-The long-term goal is to build a **financial intelligence platform powered by AI agents** capable of assisting investors with deeper research and decision-making.
+To build a **real-world financial intelligence system powered by AI agents** that helps users make smarter investment decisions.
