@@ -153,6 +153,37 @@ def indicator_agent(tech):
     Include what they imply for trading decisions.
     """)
 
+def recommendation_agent(symbol, summary, tech):
+    return llm_call(f"""
+    Based on this analysis of {symbol}:
+
+    {summary}
+
+    Indicators:
+    RSI: {tech['rsi']}
+    SMA: {tech['sma']}
+    EMA: {tech['ema']}
+
+    Give:
+    1. Final Recommendation (BUY / HOLD / SELL)
+    2. Confidence Level (Low / Medium / High)
+    3. One-line justification
+
+    Keep it short and clear.
+    """)
+
+def calculate_risk_score(tech):
+    rsi = tech['rsi']
+
+    if rsi > 70:
+        return "High Risk (Overbought)"
+    elif rsi < 30:
+        return "Low Risk (Oversold Opportunity)"
+    else:
+        return "Moderate Risk"
+        
+recommendation = recommendation_agent(symbol1, summary, tech)
+risk = calculate_risk_score(tech)
 # -------------------------
 # UI
 # -------------------------
@@ -219,6 +250,8 @@ if st.button("Analyze") and symbol1:
         st.subheader("Final Decision")
         st.success(verdict)
 
+        
+
     # Comparison
     with tabs[3]:
         if symbol2:
@@ -248,3 +281,16 @@ if st.button("Analyze") and symbol1:
     # Macro
     with tabs[6]:
         st.write(macro_agent())
+
+    st.subheader("📌 Investment Signal")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+         st.info(recommendation)
+
+    with col2:
+      st.write("**Risk Level:**")
+    st.write(risk)
+
+    st.markdown("---")
