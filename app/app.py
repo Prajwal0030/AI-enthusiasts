@@ -72,6 +72,9 @@ def get_news(symbol):
 def get_chart(symbol):
     return yf.Ticker(symbol).history(period="30d")
 
+recommendation = recommendation_agent(symbol1, summary, tech)
+risk = calculate_risk_score(tech)
+
 # -------------------------
 # AGENTS (DETAILED OUTPUT)
 # -------------------------
@@ -182,8 +185,7 @@ def calculate_risk_score(tech):
     else:
         return "Moderate Risk"
         
-recommendation = recommendation_agent(symbol1, summary, tech)
-risk = calculate_risk_score(tech)
+
 # -------------------------
 # UI
 # -------------------------
@@ -291,6 +293,6 @@ if st.button("Analyze") and symbol1:
 
     with col2:
       st.write("**Risk Level:**")
-    st.write(risk)
+      st.write(risk)
 
-    st.markdown("---")
+      st.markdown("---")
