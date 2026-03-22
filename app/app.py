@@ -72,8 +72,7 @@ def get_news(symbol):
 def get_chart(symbol):
     return yf.Ticker(symbol).history(period="30d")
 
-recommendation = recommendation_agent(symbol1, summary, tech)
-risk = calculate_risk_score(tech)
+
 
 # -------------------------
 # AGENTS (DETAILED OUTPUT)
@@ -213,6 +212,8 @@ if st.button("Analyze") and symbol1:
     news = get_news(symbol1)
 
     summary = summary_agent(symbol1, stock, tech, news)
+    recommendation = recommendation_agent(symbol1, summary, tech)
+    risk = calculate_risk_score(tech)
     bull = bull_agent(symbol1, summary)
     bear = bear_agent(symbol1, summary)
     verdict = judge_agent(bull, bear)
