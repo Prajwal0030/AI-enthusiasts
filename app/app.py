@@ -8,10 +8,13 @@ from langchain_core.messages import HumanMessage
 import os
 
 # -------------------------
-# CONFIG
+# PAGE CONFIG
 # -------------------------
-st.set_page_config(page_title="AI Financial Research", layout="wide")
+st.set_page_config(page_title="AI Financial Platform", layout="wide")
 
+# -------------------------
+# API KEYS
+# -------------------------
 GROQ_API_KEY = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY") or st.secrets.get("NEWS_API_KEY")
 
@@ -56,7 +59,7 @@ def delete_stock(symbol):
 init_db()
 
 # -------------------------
-# DATA FUNCTIONS (SAFE)
+# SAFE DATA FUNCTIONS
 # -------------------------
 @st.cache_data(ttl=600)
 def get_stock_data(symbol):
@@ -100,8 +103,8 @@ def get_fundamentals(symbol):
         info = yf.Ticker(symbol).info
         return {
             "pe": info.get("trailingPE"),
-            "market_cap": info.get("marketCap"),
             "roe": info.get("returnOnEquity"),
+            "market_cap": info.get("marketCap"),
             "sector": info.get("sector")
         }
     except:
@@ -109,154 +112,116 @@ def get_fundamentals(symbol):
 
 @st.cache_data(ttl=600)
 def get_news(symbol):
-    if not NEWS_API_KEY:
-        return "News unavailable"
-
     try:
         query = symbol.replace(".NS", "")
         url = f"https://newsapi.org/v2/everything?q={query}&pageSize=3&apiKey={NEWS_API_KEY}"
         res = requests.get(url).json()
-        headlines = [a["title"] for a in res.get("articles", [])]
-        return "\n".join(headlines[:3])
+        return "\n".join([a["title"] for a in res.get("articles", [])[:3]])
     except:
-        return "Error fetching news"
+        return "News unavailable"
 
 @st.cache_data(ttl=600)
 def get_chart(symbol):
-    try:
-        return yf.Ticker(symbol).history(period="30d")
-    except:
-        return None
+    return yf.Ticker(symbol).history(period="30d")
 
 # -------------------------
-# SECTOR MAP
-# -------------------------
-SECTOR_MAP = {
-    "RELIANCE.NS": ["ONGC.NS", "IOC.NS"],
-    "TCS.NS": ["INFY.NS", "WIPRO.NS"]
-}
-
-# -------------------------
-# LLM CALL
+# LLM CALL (STRICT)
 # -------------------------
 def llm_call(prompt):
     return llm.invoke([HumanMessage(content=prompt)]).content
 
 # -------------------------
-# AGENTS
+# AGENTS (NO CODE OUTPUT)
 # -------------------------
 def summary_agent(symbol, stock, tech, news):
     return llm_call(f"""
-    Analyze {symbol}:
+    Analyze {symbol} stock.
 
-    Price: {stock}
-    Indicators: {tech}
-    News: {news}
+    IMPORTANT:
+    No code. No explanations. Only insights.
 
-    Give structured financial analysis + recommendation.
+    Data:
+    {stock}, {tech}, {news}
+
+    Give:
+    - Trend
+    - Position
+    - News impact
+    - Final recommendation
     """)
 
-def bull_agent(symbol, summary):
-    return llm_call(f"Give bullish case for {symbol}: {summary}")
-
-def bear_agent(symbol, summary):
-    return llm_call(f"Give bearish case for {symbol}: {summary}")
-
-def judge_agent(bull, bear):
-    return llm_call(f"Compare:\nBull: {bull}\nBear: {bear}\nFinal decision:")
+def debate_agents(symbol, summary):
+    bull = llm_call(f"Give bullish view for {symbol}. No code.")
+    bear = llm_call(f"Give bearish risks for {symbol}. No code.")
+    judge = llm_call(f"Compare bull and bear and give final decision. No code.")
+    return bull, bear, judge
 
 def indicator_agent(tech):
-    return llm_call(f"""
-    Explain indicators:
-    SMA {tech['sma']}, EMA {tech['ema']}, RSI {tech['rsi']}
-    """)
+    return llm_call(f"Explain SMA, EMA, RSI briefly with insights. No code.")
 
 def fundamental_agent(symbol, fundamentals):
-    return llm_call(f"""
-    Analyze fundamentals of {symbol}:
-    {fundamentals}
-    """)
-
-def sector_agent(symbol, peers):
-    return llm_call(f"""
-    Compare {symbol} with peers:
-    {peers}
-    """)
-
-def macro_agent():
-    return llm_call("Explain Indian market context (RBI, inflation, sentiment)")
+    return llm_call(f"Analyze fundamentals: {fundamentals}. No code.")
 
 def portfolio_agent(data):
-    return llm_call(f"Analyze portfolio: {data}")
+    return llm_call(f"Analyze portfolio: {data}. No code.")
 
-def recommendation_agent(symbol, summary, tech):
-    return llm_call(f"""
-    Based on {symbol}:
-    {summary}
-    RSI: {tech['rsi']}
-
-    Give BUY/HOLD/SELL + confidence.
-    """)
-
-def calculate_risk(tech):
-    if tech['rsi'] > 70:
-        return "High Risk"
-    elif tech['rsi'] < 30:
-        return "Low Risk"
-    return "Moderate Risk"
+def macro_agent():
+    return llm_call("Explain Indian market conditions briefly. No code.")
 
 # -------------------------
-# UI
+# SCORING SYSTEM
 # -------------------------
-st.title("AI Financial Research Platform 🇮🇳")
+def stock_score(tech):
+    score = 50
+    if tech["rsi"] < 30:
+        score += 20
+    elif tech["rsi"] > 70:
+        score -= 20
+    return max(0, min(100, score))
+
+def portfolio_score(pdata):
+    return min(100, len(pdata) * 20)
+
+# -------------------------
+# UI HEADER
+# -------------------------
+st.title("📊 AI Financial Intelligence Platform")
 
 col1, col2 = st.columns(2)
-symbol1 = col1.text_input("Stock 1")
-symbol2 = col2.text_input("Stock 2 (optional)")
+symbol_input = col1.text_input("Stock (e.g. RELIANCE)")
+symbol2_input = col2.text_input("Compare (optional)")
 portfolio_input = st.text_input("Portfolio (comma separated)")
 
-if st.button("Analyze") and symbol1:
+# Watchlist trigger
+if "watchlist_symbol" in st.session_state:
+    symbol_input = st.session_state.watchlist_symbol
+    st.session_state.watchlist_symbol = None
 
-    symbol1 = symbol1.upper().strip()
-    if not symbol1.endswith(".NS"):
-        symbol1 += ".NS"
+if st.button("Analyze") and symbol_input:
 
-    if symbol2:
-        symbol2 = symbol2.upper().strip()
-        if not symbol2.endswith(".NS"):
-            symbol2 += ".NS"
+    symbol = symbol_input.upper().strip() + ".NS"
 
-    stock = get_stock_data(symbol1)
-    tech = get_technical_indicators(symbol1)
-    news = get_news(symbol1)
-    fundamentals = get_fundamentals(symbol1)
+    stock = get_stock_data(symbol)
+    tech = get_technical_indicators(symbol)
+    news = get_news(symbol)
+    fundamentals = get_fundamentals(symbol)
 
-    summary = summary_agent(symbol1, stock, tech, news)
-    bull = bull_agent(symbol1, summary)
-    bear = bear_agent(symbol1, summary)
-    verdict = judge_agent(bull, bear)
-    recommendation = recommendation_agent(symbol1, summary, tech)
-    risk = calculate_risk(tech)
+    summary = summary_agent(symbol, stock, tech, news)
+    bull, bear, judge = debate_agents(symbol, summary)
 
     tabs = st.tabs([
-        "Dashboard",
-        "AI Summary",
-        "Debate",
-        "Comparison",
-        "Portfolio",
-        "Indicators",
-        "Fundamentals",
-        "Sector",
-        "Watchlist",
-        "Macro"
+        "Dashboard", "Summary", "Debate", "Comparison",
+        "Portfolio", "Indicators", "Fundamentals",
+        "Watchlist", "Market"
     ])
 
     # Dashboard
     with tabs[0]:
         st.metric("Price", stock["price"])
         st.metric("Volume", stock["volume"])
+        st.metric("Score", stock_score(tech))
 
-        chart = get_chart(symbol1)
+        chart = get_chart(symbol)
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=chart.index, y=chart["Close"]))
         st.plotly_chart(fig)
@@ -264,24 +229,25 @@ if st.button("Analyze") and symbol1:
     # Summary
     with tabs[1]:
         st.write(summary)
-        st.success(recommendation)
-        st.write(f"Risk: {risk}")
 
     # Debate
     with tabs[2]:
-        st.write("Bull:", bull)
-        st.write("Bear:", bear)
-        st.success(verdict)
+        st.subheader("Bull")
+        st.write(bull)
+        st.subheader("Bear")
+        st.write(bear)
+        st.success(judge)
 
     # Comparison
     with tabs[3]:
-        if symbol2:
-            d1 = get_chart(symbol1)
-            d2 = get_chart(symbol2)
+        if symbol2_input:
+            s2 = symbol2_input.upper().strip() + ".NS"
+            d1 = get_chart(symbol)
+            d2 = get_chart(s2)
 
             fig = go.Figure()
-            fig.add_trace(go.Scatter(x=d1.index, y=d1["Close"], name=symbol1))
-            fig.add_trace(go.Scatter(x=d2.index, y=d2["Close"], name=symbol2))
+            fig.add_trace(go.Scatter(x=d1.index, y=d1["Close"], name=symbol))
+            fig.add_trace(go.Scatter(x=d2.index, y=d2["Close"], name=s2))
             st.plotly_chart(fig)
 
     # Portfolio
@@ -290,39 +256,33 @@ if st.button("Analyze") and symbol1:
             symbols = [s.strip().upper()+".NS" for s in portfolio_input.split(",")]
             pdata = [get_stock_data(s) for s in symbols if get_stock_data(s)]
             st.write(portfolio_agent(pdata))
+            st.metric("Portfolio Score", portfolio_score(pdata))
 
     # Indicators
     with tabs[5]:
-        st.metric("SMA", tech['sma'])
-        st.metric("EMA", tech['ema'])
-        st.metric("RSI", tech['rsi'])
+        st.metric("SMA", tech["sma"])
+        st.metric("EMA", tech["ema"])
+        st.metric("RSI", tech["rsi"])
         st.write(indicator_agent(tech))
 
     # Fundamentals
     with tabs[6]:
-        st.write(fundamental_agent(symbol1, fundamentals))
-
-    # Sector
-    with tabs[7]:
-        peers = SECTOR_MAP.get(symbol1, [])
-        st.write(peers)
-        st.write(sector_agent(symbol1, peers))
+        st.write(fundamental_agent(symbol, fundamentals))
 
     # Watchlist
-    with tabs[8]:
+    with tabs[7]:
         if st.button("Add to Watchlist"):
-            add_stock(symbol1)
-            st.success("Added!")
+            add_stock(symbol)
 
-        watchlist = get_watchlist()
-
-        for s in watchlist:
+        for s in get_watchlist():
             col1, col2 = st.columns([3,1])
-            col1.write(s)
-            if col2.button(f"Remove {s}", key=s):
+            if col1.button(s):
+                st.session_state.watchlist_symbol = s
+                st.rerun()
+            if col2.button("Remove", key=s):
                 delete_stock(s)
                 st.rerun()
 
-    # Macro
-    with tabs[9]:
+    # Market
+    with tabs[8]:
         st.write(macro_agent())
