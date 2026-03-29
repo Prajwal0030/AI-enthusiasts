@@ -219,42 +219,42 @@ if st.button("Analyze") and symbol_input:
 
     # Indicators
     with tabs[5]:
-     indicators = get_indicators(symbol)
+        indicators = get_indicators(symbol)
 
-     st.metric("SMA (14)", indicators["SMA"])
-     st.metric("EMA (14)", indicators["EMA"])
-     st.metric("RSI", indicators["RSI"])
+        st.metric("SMA (14)", indicators["SMA"])
+        st.metric("EMA (14)", indicators["EMA"])
+        st.metric("RSI", indicators["RSI"])
 
-     if indicators["RSI"] > 70:
-        st.warning("Overbought (High Risk)")
-     elif indicators["RSI"] < 30:
-        st.success("Oversold (Opportunity)")
-     else:
-        st.info("Neutral Zone")
+        if indicators["RSI"] > 70:
+            st.warning("Overbought (High Risk)")
+        elif indicators["RSI"] < 30:
+            st.success("Oversold (Opportunity)")
+        else:
+            st.info("Neutral Zone")
     # Market
     with tabs[6]:
-     st.subheader("📊 Market Context")
+        st.subheader("📊 Market Context")
 
-     hour = datetime.now().hour
+        hour = datetime.now().hour
 
-     if 9 <= hour <= 15:
-        st.success("🟢 Market Open (NSE)")
-     else:
-        st.warning("🔴 Market Closed")
+        if 9 <= hour <= 15:
+          st.success("🟢 Market Open (NSE)")
+        else:
+          st.warning("🔴 Market Closed")
 
-     st.markdown("---")
+        st.markdown("---")
 
-     st.write("### 🇮🇳 Indian Market Insights")
-     st.write("• NSE & BSE dominate Indian equities")
-     st.write("• IT, Banking, FMCG are key sectors")
-     st.write("• Influenced by RBI, inflation, global markets")
+        st.write("### 🇮🇳 Indian Market Insights")
+        st.write("• NSE & BSE dominate Indian equities")
+        st.write("• IT, Banking, FMCG are key sectors")
+        st.write("• Influenced by RBI, inflation, global markets")
 
-     st.markdown("---")
+        st.markdown("---")
 
-     st.write("### 💰 Currency")
-     st.info("All values shown in INR (₹)")
+        st.write("### 💰 Currency")
+        st.info("All values shown in INR (₹)")
 
-     st.markdown("---")
+        st.markdown("---")
 
     
     
@@ -289,24 +289,17 @@ if st.button("Analyze") and symbol_input:
 
     # Sector
     with tabs[9]:
-     st.write("### Sector Comparison (IT Sector Example)")
+        st.write("### Sector Comparison (IT Sector Example)")
 
-     peers = ["TCS.NS","INFY.NS","WIPRO.NS"]
+        peers = ["TCS.NS","INFY.NS","WIPRO.NS"]
 
-    for p in peers:
-        f = get_fundamentals(p)
-
-        st.write(f"*{p}*")
-        st.write(f"P/E: {f['PE']}")
-        st.write(f"ROE: {f['ROE']}")
-        st.write("---")
-    for p in peers:
-        f = get_fundamentals(p)
-
-        st.write(f"*{p}*")
-        st.write(f"P/E: {f['PE']}")
-        st.write(f"ROE: {f['ROE']}")
-        st.write("---")
+       
         for p in peers:
             f = get_fundamentals(p)
-            st.write(f"{p} → PE: {f.get('PE')} | ROE: {f.get('ROE')}")
+
+        st.write(f"*{p}*")
+        st.write(f"P/E: {f['PE']}")
+        st.write(f"ROE: {f['ROE']}")
+        st.write("---")
+        
+        st.write(f"{p} → PE: {f.get('PE')} | ROE: {f.get('ROE')}")
