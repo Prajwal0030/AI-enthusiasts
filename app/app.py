@@ -10,7 +10,7 @@ from datetime import datetime
 # -------------------------
 # CONFIG
 # -------------------------
-st.set_page_config(page_title="AI Financial Platform", layout="wide")
+st.set_page_config(page_title="Multi-Agent Financial Reserach AI", layout="wide")
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY") or st.secrets.get("NEWS_API_KEY")
@@ -128,7 +128,7 @@ def llm_call(prompt):
 # -------------------------
 # UI INPUT (CONNECTED)
 # -------------------------
-st.title("AI Financial Intelligence Platform")
+st.title("Multi-Agent Financial Reserach AI")
 
 symbol_input = st.text_input(
     "Stock (e.g. RELIANCE)",
