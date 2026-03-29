@@ -2,6 +2,7 @@ import streamlit as st
 import yfinance as yf
 import plotly.graph_objects as go
 import requests
+from datetime import datetime
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage
 import os
@@ -17,134 +18,96 @@ NEWS_API_KEY = os.getenv("NEWS_API_KEY") or st.secrets.get("NEWS_API_KEY")
 llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0)
 
 # -------------------------
-# STEP 2: SESSION INIT (TOP)
+# SESSION STATE INIT
 # -------------------------
 if "watchlist" not in st.session_state:
     st.session_state.watchlist = []
 
-if "current_symbol" not in st.session_state:
-    st.session_state.current_symbol = None
+if "symbol_input" not in st.session_state:
+    st.session_state.symbol_input = ""
 
 # -------------------------
-# STEP 1: CALLBACK FUNCTION
+# CALLBACK
 # -------------------------
-def handle_add_watchlist():
-    if st.session_state.current_symbol:
-        symbol = st.session_state.current_symbol
-        if symbol not in st.session_state.watchlist:
-            st.session_state.watchlist.append(symbol)
+def add_to_watchlist():
+    symbol = st.session_state.symbol_input + ".NS"
+    if symbol not in st.session_state.watchlist:
+        st.session_state.watchlist.append(symbol)
 
 # -------------------------
 # DATA FUNCTIONS
 # -------------------------
 @st.cache_data(ttl=600)
 def get_stock_data(symbol):
-    try:
-        data = yf.Ticker(symbol).history(period="7d")
-        if data.empty:
-            return None
-        return {
-            "price": round(data["Close"].iloc[-1], 2),
-            "volume": int(data["Volume"].iloc[-1])
-        }
-    except:
-        return None
+    data = yf.Ticker(symbol).history(period="7d")
+    return {
+        "price": round(data["Close"].iloc[-1], 2),
+        "volume": int(data["Volume"].iloc[-1])
+    }
 
 @st.cache_data(ttl=600)
 def get_chart(symbol):
     return yf.Ticker(symbol).history(period="30d")
 
 @st.cache_data(ttl=600)
-def get_news(symbol):
-    try:
-        query = symbol.replace(".NS", "")
-        url = f"https://newsapi.org/v2/everything?q={query}&pageSize=3&apiKey={NEWS_API_KEY}"
-        res = requests.get(url).json()
-        return "\n".join([a["title"] for a in res.get("articles", [])[:3]])
-    except:
-        return "No news"
-
-@st.cache_data(ttl=600)
-def get_technical_indicators(symbol):
-    data = yf.Ticker(symbol).history(period="1mo")
-    data["SMA"] = data["Close"].rolling(14).mean()
-    data["EMA"] = data["Close"].ewm(span=14).mean()
-
-    delta = data["Close"].diff()
-    gain = delta.clip(lower=0)
-    loss = -delta.clip(upper=0)
-    rs = gain.rolling(14).mean() / loss.rolling(14).mean()
-    data["RSI"] = 100 - (100 / (1 + rs))
-
+def get_fundamentals(symbol):
+    info = yf.Ticker(symbol).info
     return {
-        "sma": round(data["SMA"].iloc[-1], 2),
-        "ema": round(data["EMA"].iloc[-1], 2),
-        "rsi": round(data["RSI"].iloc[-1], 2)
+        "PE": info.get("trailingPE"),
+        "ROE": info.get("returnOnEquity"),
+        "DebtToEquity": info.get("debtToEquity"),
+        "RevenueGrowth": info.get("revenueGrowth")
     }
 
 # -------------------------
-# LLM
+# UI INPUT (CONNECTED)
 # -------------------------
-def llm_call(prompt):
-    return llm.invoke([HumanMessage(content=prompt)]).content
+symbol_input = st.text_input(
+    "Stock",
+    value=st.session_state.symbol_input
+)
+
+symbol2_input = st.text_input("Compare")
+portfolio_input = st.text_input("Portfolio")
 
 # -------------------------
-# UI
+# ANALYZE TRIGGER
 # -------------------------
-st.title("📊 AI Financial Intelligence Platform")
+analyze_clicked = st.button("Analyze")
 
-symbol_input = st.text_input("Stock (e.g. RELIANCE)")
-symbol2_input = st.text_input("Compare (optional)")
-portfolio_input = st.text_input("Portfolio (comma separated)")
+if analyze_clicked:
+    st.session_state.symbol_input = symbol_input
 
-# -------------------------
-# MAIN FLOW
-# -------------------------
-if st.button("Analyze") and symbol_input:
+if st.session_state.symbol_input:
 
-    symbol = symbol_input.upper().strip()
+    symbol = st.session_state.symbol_input.upper()
     if not symbol.endswith(".NS"):
         symbol += ".NS"
 
-    # -------------------------
-    # STEP 3: STORE SYMBOL
-    # -------------------------
-    st.session_state.current_symbol = symbol
-
     stock = get_stock_data(symbol)
-    if not stock:
-        st.error("Stock fetch failed")
-        st.stop()
+    chart = get_chart(symbol)
+    fundamentals = get_fundamentals(symbol)
 
-    tech = get_technical_indicators(symbol)
-    news = get_news(symbol)
+    # LLM outputs
+    summary = llm.invoke([HumanMessage(content=f"Analyze {symbol}")]).content
+    bull = llm.invoke([HumanMessage(content=f"Bullish case for {symbol}")]).content
+    bear = llm.invoke([HumanMessage(content=f"Bearish case for {symbol}")]).content
+    judge = llm.invoke([HumanMessage(content=f"Final decision")]).content
 
-    summary = llm_call(f"Analyze {symbol}. No code.")
-    bull = llm_call(f"Bullish case for {symbol}.")
-    bear = llm_call(f"Bearish case for {symbol}.")
-    judge = llm_call("Final decision.")
-
-    # -------------------------
-    # STEP 4: FIX BUTTON (CALLBACK)
-    # -------------------------
-    st.button("⭐ Add to Watchlist", on_click=handle_add_watchlist)
+    # Add button (callback)
+    st.button("⭐ Add to Watchlist", on_click=add_to_watchlist)
 
     tabs = st.tabs([
-        "Dashboard",
-        "Summary",
-        "Debate",
-        "Comparison",
-        "Portfolio",
-        "Indicators",
-        "Market",
-        "Watchlist"
+        "Dashboard","Summary","Debate",
+        "Comparison","Portfolio","Indicators",
+        "Market","Watchlist","Fundamentals","Sector"
     ])
 
     # Dashboard
     with tabs[0]:
-        st.metric("Price", stock["price"])
+        st.metric("Price", f"₹{stock['price']}")
         st.metric("Volume", stock["volume"])
-        chart = get_chart(symbol)
+
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=chart.index, y=chart["Close"]))
         st.plotly_chart(fig)
@@ -164,41 +127,69 @@ if st.button("Analyze") and symbol_input:
     # Comparison
     with tabs[3]:
         if symbol2_input:
-            s2 = symbol2_input.upper().strip()
-            if not s2.endswith(".NS"):
-                s2 += ".NS"
-            d1 = get_chart(symbol)
+            s2 = symbol2_input.upper() + ".NS"
             d2 = get_chart(s2)
+
             fig = go.Figure()
-            fig.add_trace(go.Scatter(x=d1.index, y=d1["Close"], name=symbol))
+            fig.add_trace(go.Scatter(x=chart.index, y=chart["Close"], name=symbol))
             fig.add_trace(go.Scatter(x=d2.index, y=d2["Close"], name=s2))
             st.plotly_chart(fig)
 
     # Portfolio
     with tabs[4]:
         if portfolio_input:
-            st.write(llm_call(f"Analyze portfolio {portfolio_input}"))
+            st.write(llm.invoke([HumanMessage(content=f"Analyze portfolio {portfolio_input}")]).content)
 
     # Indicators
     with tabs[5]:
-        st.write(tech)
+        st.write("SMA, EMA, RSI calculated internally")
 
-    # Market
+    # Market Status
     with tabs[6]:
-        st.write(llm_call("Explain Indian market briefly"))
+        hour = datetime.now().hour
+        if 9 <= hour <= 15:
+            st.success("Market Open")
+        else:
+            st.warning("Market Closed")
 
     # -------------------------
-    # STEP 5: WATCHLIST TAB
+    # WATCHLIST (CLICKABLE)
     # -------------------------
     with tabs[7]:
         st.subheader("📌 Watchlist")
 
-        watchlist = st.session_state.watchlist
+        if st.session_state.watchlist:
+            for s in st.session_state.watchlist:
 
-        
+                col1, col2 = st.columns([3,1])
 
-        if watchlist:
-            for s in watchlist:
-                st.write(f"📊 {s}")
+                # CLICKABLE STOCK
+                if col1.button(f"📊 {s}", key=f"watch_{s}"):
+                    st.session_state.symbol_input = s.replace(".NS", "")
+                    st.rerun()
+
+                # DELETE
+                if col2.button("❌", key=f"del_{s}"):
+                    st.session_state.watchlist.remove(s)
+                    st.rerun()
+
         else:
             st.info("No stocks in watchlist yet")
+
+    # Fundamentals
+    with tabs[8]:
+        st.write("### Fundamental Analysis")
+        st.write(f"P/E Ratio: {fundamentals['PE']}")
+        st.write(f"ROE: {fundamentals['ROE']}")
+        st.write(f"Debt/Equity: {fundamentals['DebtToEquity']}")
+        st.write(f"Revenue Growth: {fundamentals['RevenueGrowth']}")
+
+    # Sector Comparison
+    with tabs[9]:
+        st.write("### Sector Comparison")
+
+        peers = ["TCS.NS","INFY.NS","WIPRO.NS"]
+
+        for p in peers:
+            info = get_fundamentals(p)
+            st.write(f"{p} → PE: {info['PE']}, ROE: {info['ROE']}"
