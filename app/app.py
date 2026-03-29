@@ -218,7 +218,7 @@ if st.button("Analyze") and symbol_input:
             st.write(llm_call(f"Analyze portfolio {portfolio_input}"))
 
     # Indicators
-   with tabs[5]:
+    with tabs[5]:
      indicators = get_indicators(symbol)
 
      st.metric("SMA (14)", indicators["SMA"])
