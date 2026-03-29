@@ -8,13 +8,10 @@ from langchain_core.messages import HumanMessage
 import os
 
 # -------------------------
-# PAGE CONFIG
+# CONFIG
 # -------------------------
 st.set_page_config(page_title="AI Financial Platform", layout="wide")
 
-# -------------------------
-# API KEYS
-# -------------------------
 GROQ_API_KEY = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY") or st.secrets.get("NEWS_API_KEY")
 
@@ -59,7 +56,7 @@ def delete_stock(symbol):
 init_db()
 
 # -------------------------
-# SAFE DATA FUNCTIONS
+# DATA FUNCTIONS
 # -------------------------
 @st.cache_data(ttl=600)
 def get_stock_data(symbol):
@@ -98,19 +95,6 @@ def get_technical_indicators(symbol):
         return None
 
 @st.cache_data(ttl=600)
-def get_fundamentals(symbol):
-    try:
-        info = yf.Ticker(symbol).info
-        return {
-            "pe": info.get("trailingPE"),
-            "roe": info.get("returnOnEquity"),
-            "market_cap": info.get("marketCap"),
-            "sector": info.get("sector")
-        }
-    except:
-        return None
-
-@st.cache_data(ttl=600)
 def get_news(symbol):
     try:
         query = symbol.replace(".NS", "")
@@ -125,77 +109,40 @@ def get_chart(symbol):
     return yf.Ticker(symbol).history(period="30d")
 
 # -------------------------
-# LLM CALL (STRICT)
+# LLM CALL
 # -------------------------
 def llm_call(prompt):
     return llm.invoke([HumanMessage(content=prompt)]).content
 
 # -------------------------
-# AGENTS (NO CODE OUTPUT)
+# AGENTS
 # -------------------------
 def summary_agent(symbol, stock, tech, news):
-    return llm_call(f"""
-    Analyze {symbol} stock.
+    return llm_call(f"Analyze {symbol}. Give trend, position, news impact, recommendation. No code.")
 
-    IMPORTANT:
-    No code. No explanations. Only insights.
-
-    Data:
-    {stock}, {tech}, {news}
-
-    Give:
-    - Trend
-    - Position
-    - News impact
-    - Final recommendation
-    """)
-
-def debate_agents(symbol, summary):
-    bull = llm_call(f"Give bullish view for {symbol}. No code.")
-    bear = llm_call(f"Give bearish risks for {symbol}. No code.")
-    judge = llm_call(f"Compare bull and bear and give final decision. No code.")
+def debate_agents(symbol):
+    bull = llm_call(f"Bullish case for {symbol}. No code.")
+    bear = llm_call(f"Bearish risks for {symbol}. No code.")
+    judge = llm_call(f"Final decision. No code.")
     return bull, bear, judge
 
 def indicator_agent(tech):
-    return llm_call(f"Explain SMA, EMA, RSI briefly with insights. No code.")
-
-def fundamental_agent(symbol, fundamentals):
-    return llm_call(f"Analyze fundamentals: {fundamentals}. No code.")
+    return llm_call(f"Explain SMA, EMA, RSI with insights. No code.")
 
 def portfolio_agent(data):
-    return llm_call(f"Analyze portfolio: {data}. No code.")
+    return llm_call(f"Analyze portfolio {data}. No code.")
 
 def macro_agent():
-    return llm_call("Explain Indian market conditions briefly. No code.")
+    return llm_call("Explain Indian market briefly. No code.")
 
 # -------------------------
-# SCORING SYSTEM
-# -------------------------
-def stock_score(tech):
-    score = 50
-    if tech["rsi"] < 30:
-        score += 20
-    elif tech["rsi"] > 70:
-        score -= 20
-    return max(0, min(100, score))
-
-def portfolio_score(pdata):
-    return min(100, len(pdata) * 20)
-
-# -------------------------
-# UI HEADER
+# UI
 # -------------------------
 st.title("📊 AI Financial Intelligence Platform")
 
-col1, col2 = st.columns(2)
-symbol_input = col1.text_input("Stock (e.g. RELIANCE)")
-symbol2_input = col2.text_input("Compare (optional)")
+symbol_input = st.text_input("Stock (e.g. RELIANCE)")
+symbol2_input = st.text_input("Compare (optional)")
 portfolio_input = st.text_input("Portfolio (comma separated)")
-
-# Watchlist trigger
-if "watchlist_symbol" in st.session_state:
-    symbol_input = st.session_state.watchlist_symbol
-    st.session_state.watchlist_symbol = None
 
 # Watchlist click handler
 if "selected_stock" in st.session_state:
@@ -204,35 +151,42 @@ if "selected_stock" in st.session_state:
 
 if st.button("Analyze") and symbol_input:
 
-    symbol = symbol_input.upper().strip() + ".NS"
+    symbol = symbol_input.upper().strip()
+    if not symbol.endswith(".NS"):
+        symbol += ".NS"
 
     stock = get_stock_data(symbol)
+
     if stock is None:
-      st.error("Invalid stock or API issue")
-      st.stop()
+        st.error("Stock fetch failed")
+        st.stop()
+
     tech = get_technical_indicators(symbol)
     news = get_news(symbol)
-    fundamentals = get_fundamentals(symbol)
 
     summary = summary_agent(symbol, stock, tech, news)
-    bull, bear, judge = debate_agents(symbol, summary)
+    bull, bear, judge = debate_agents(symbol)
+
+    # ⭐ Add Watchlist
+    if st.button("⭐ Add to Watchlist"):
+        add_stock(symbol)
+        st.success(f"{symbol} added")
 
     tabs = st.tabs([
-        "Dashboard", "Summary", "Debate", "Comparison",
-        "Portfolio", "Indicators", "Fundamentals",
-        "Watchlist", "Market"
+        "Dashboard",
+        "Summary",
+        "Debate",
+        "Comparison",
+        "Portfolio",
+        "Indicators",
+        "Market",
+        "Watchlist"
     ])
 
     # Dashboard
     with tabs[0]:
-        if stock:
-             st.metric("Price", stock["price"])
-             st.metric("Volume", stock["volume"])
-        else:
-            st.error("Failed to fetch stock data. Try again.")
-            st.stop()
+        st.metric("Price", stock["price"])
         st.metric("Volume", stock["volume"])
-        st.metric("Score", stock_score(tech))
 
         chart = get_chart(symbol)
         fig = go.Figure()
@@ -245,16 +199,19 @@ if st.button("Analyze") and symbol_input:
 
     # Debate
     with tabs[2]:
-        st.subheader("Bull")
+        st.write("### Bull")
         st.write(bull)
-        st.subheader("Bear")
+        st.write("### Bear")
         st.write(bear)
         st.success(judge)
 
     # Comparison
     with tabs[3]:
         if symbol2_input:
-            s2 = symbol2_input.upper().strip() + ".NS"
+            s2 = symbol2_input.upper().strip()
+            if not s2.endswith(".NS"):
+                s2 += ".NS"
+
             d1 = get_chart(symbol)
             d2 = get_chart(s2)
 
@@ -269,52 +226,35 @@ if st.button("Analyze") and symbol_input:
             symbols = [s.strip().upper()+".NS" for s in portfolio_input.split(",")]
             pdata = [get_stock_data(s) for s in symbols if get_stock_data(s)]
             st.write(portfolio_agent(pdata))
-            st.metric("Portfolio Score", portfolio_score(pdata))
 
     # Indicators
     with tabs[5]:
-        st.metric("SMA", tech["sma"])
-        st.metric("EMA", tech["ema"])
-        st.metric("RSI", tech["rsi"])
-        st.write(indicator_agent(tech))
+        if tech:
+            st.metric("SMA", tech["sma"])
+            st.metric("EMA", tech["ema"])
+            st.metric("RSI", tech["rsi"])
+            st.write(indicator_agent(tech))
 
-    # Fundamentals
+    # Market
     with tabs[6]:
-        st.write(fundamental_agent(symbol, fundamentals))
+        st.write(macro_agent())
 
     # Watchlist
     with tabs[7]:
-         st.subheader("📌 Watchlist")
+        st.subheader("📌 Watchlist")
 
-    # Add current stock
-    if st.button("➕ Add Current Stock"):
-        add_stock(symbol)
-        st.success(f"{symbol} added to watchlist")
+        watchlist = get_watchlist()
 
-    st.markdown("---")
+        if watchlist:
+            for s in watchlist:
+                col1, col2 = st.columns([3,1])
 
-    watchlist = get_watchlist()
+                if col1.button(f"📊 {s}", key=f"view_{s}"):
+                    st.session_state.selected_stock = s
+                    st.rerun()
 
-    if watchlist:
-        st.write("### Saved Stocks")
-
-        for stock_item in watchlist:
-            col1, col2 = st.columns([3,1])
-
-            # CLICK TO ANALYZE
-            if col1.button(f"📊 {stock_item}", key=f"view_{stock_item}"):
-                st.session_state.selected_stock = stock_item
-                st.rerun()
-
-            # DELETE
-            if col2.button("❌", key=f"del_{stock_item}"):
-                delete_stock(stock_item)
-                st.success(f"{stock_item} removed")
-                st.rerun()
-
-    else:
-        st.info("No stocks in watchlist yet")
-
-    # Market
-    with tabs[8]:
-        st.write(macro_agent())
+                if col2.button("❌", key=f"del_{s}"):
+                    delete_stock(s)
+                    st.rerun()
+        else:
+            st.info("No stocks in watchlist yet")
