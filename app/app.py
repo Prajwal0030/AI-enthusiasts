@@ -61,16 +61,51 @@ def get_chart(symbol):
 @st.cache_data(ttl=600)
 def get_fundamentals(symbol):
     try:
-        info = yf.Ticker(symbol).info
-        return {
-            "PE": info.get("trailingPE"),
-            "ROE": info.get("returnOnEquity"),
-            "Debt": info.get("debtToEquity"),
-            "Growth": info.get("revenueGrowth")
-        }
-    except:
-        return {}
+        ticker = yf.Ticker(symbol)
 
+        # fallback-safe extraction
+        info = ticker.info if ticker.info else {}
+
+        pe = info.get("trailingPE") or info.get("forwardPE")
+        roe = info.get("returnOnEquity")
+        debt = info.get("debtToEquity")
+        growth = info.get("earningsGrowth") or info.get("revenueGrowth")
+
+        return {
+            "PE": pe if pe else "N/A",
+            "ROE": roe if roe else "N/A",
+            "Debt": debt if debt else "N/A",
+            "Growth": growth if growth else "N/A"
+        }
+
+    except:
+        return {
+            "PE": "N/A",
+            "ROE": "N/A",
+            "Debt": "N/A",
+            "Growth": "N/A"
+        }
+
+@st.cache_data(ttl=600)
+def get_indicators(symbol):
+    data = yf.Ticker(symbol).history(period="1mo")
+
+    data["SMA"] = data["Close"].rolling(14).mean()
+    data["EMA"] = data["Close"].ewm(span=14).mean()
+
+    delta = data["Close"].diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+
+    rs = gain.rolling(14).mean() / loss.rolling(14).mean()
+    data["RSI"] = 100 - (100 / (1 + rs))
+
+    return {
+        "SMA": round(data["SMA"].iloc[-1], 2),
+        "EMA": round(data["EMA"].iloc[-1], 2),
+        "RSI": round(data["RSI"].iloc[-1], 2)
+    }
+    
 @st.cache_data(ttl=600)
 def get_news(symbol):
     try:
@@ -183,17 +218,42 @@ if st.button("Analyze") and symbol_input:
             st.write(llm_call(f"Analyze portfolio {portfolio_input}"))
 
     # Indicators
-    with tabs[5]:
-        st.write("Basic indicators computed internally (SMA, EMA, RSI)")
+   with tabs[5]:
+    indicators = get_indicators(symbol)
 
+    st.metric("SMA (14)", indicators["SMA"])
+    st.metric("EMA (14)", indicators["EMA"])
+    st.metric("RSI", indicators["RSI"])
+
+    if indicators["RSI"] > 70:
+        st.warning("Overbought (High Risk)")
+    elif indicators["RSI"] < 30:
+        st.success("Oversold (Opportunity)")
+    else:
+        st.info("Neutral Zone")
     # Market
     with tabs[6]:
-        hour = datetime.now().hour
-        if 9 <= hour <= 15:
-            st.success("Market Open")
-        else:
-            st.warning("Market Closed")
+     st.subheader("📊 Market Context")
+ 
+     hour = datetime.now().hour
 
+      if 9 <= hour <= 15:
+        st.success("🟢 Market Open (NSE)")
+      else:
+        st.warning("🔴 Market Closed")
+
+    st.markdown("---")
+
+    st.write("### 🇮🇳 Indian Market Insights")
+
+    st.write("• NSE & BSE dominate Indian equities")
+    st.write("• IT, Banking, FMCG are key sectors")
+    st.write("• Influenced by RBI, inflation, global markets")
+
+    st.markdown("---")
+
+    st.write("### 💰 Currency")
+    st.info("All values shown in INR (₹)")
     # -------------------------
     # WATCHLIST (FIXED + CLICKABLE)
     # -------------------------
@@ -225,10 +285,17 @@ if st.button("Analyze") and symbol_input:
 
     # Sector
     with tabs[9]:
-        st.write("### Sector Comparison")
+     st.write("### Sector Comparison (IT Sector Example)")
 
-        peers = ["TCS.NS","INFY.NS","WIPRO.NS"]
+     peers = ["TCS.NS","INFY.NS","WIPRO.NS"]
 
+    for p in peers:
+        f = get_fundamentals(p)
+
+        st.write(f"*{p}*")
+        st.write(f"P/E: {f['PE']}")
+        st.write(f"ROE: {f['ROE']}")
+        st.write("---")
         for p in peers:
             f = get_fundamentals(p)
             st.write(f"{p} → PE: {f.get('PE')} | ROE: {f.get('ROE')}")
