@@ -276,7 +276,7 @@ if st.button("Analyze") and symbol_input:
 
     # Watchlist
     with tabs[7]:
-    st.subheader("📌 Watchlist")
+         st.subheader("📌 Watchlist")
 
     # Add current stock
     if st.button("➕ Add Current Stock"):
