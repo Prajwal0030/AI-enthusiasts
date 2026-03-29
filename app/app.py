@@ -2,7 +2,6 @@ import streamlit as st
 import yfinance as yf
 import plotly.graph_objects as go
 import requests
-import sqlite3
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage
 import os
@@ -22,99 +21,47 @@ if not GROQ_API_KEY:
 llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0)
 
 # -------------------------
-# DATABASE (WATCHLIST)
-# -------------------------
-def init_db():
-    conn = sqlite3.connect("stocks.db")
-    c = conn.cursor()
-    c.execute("CREATE TABLE IF NOT EXISTS watchlist (symbol TEXT PRIMARY KEY)")
-    conn.commit()
-    conn.close()
-
-def add_stock(symbol):
-    conn = sqlite3.connect("stocks.db")
-    c = conn.cursor()
-    c.execute("INSERT OR IGNORE INTO watchlist VALUES (?)", (symbol,))
-    conn.commit()
-    conn.close()
-
-def get_watchlist():
-    conn = sqlite3.connect("stocks.db")
-    c = conn.cursor()
-    c.execute("SELECT symbol FROM watchlist")
-    data = c.fetchall()
-    conn.close()
-    return [d[0] for d in data]
-
-def delete_stock(symbol):
-    conn = sqlite3.connect("stocks.db")
-    c = conn.cursor()
-    c.execute("DELETE FROM watchlist WHERE symbol=?", (symbol,))
-    conn.commit()
-    conn.close()
-
-init_db()
-
-# -------------------------
-# SAFE DATA FUNCTIONS
+# DATA FUNCTIONS
 # -------------------------
 @st.cache_data(ttl=600)
 def get_stock_data(symbol):
-    try:
-        data = yf.Ticker(symbol).history(period="7d")
-        if data.empty:
-            return None
-        return {
-            "price": round(data["Close"].iloc[-1], 2),
-            "avg": round(data["Close"].mean(), 2),
-            "volume": int(data["Volume"].iloc[-1])
-        }
-    except:
+    data = yf.Ticker(symbol).history(period="7d")
+    if data.empty:
         return None
+    return {
+        "price": round(data["Close"].iloc[-1], 2),
+        "avg": round(data["Close"].mean(), 2),
+        "volume": int(data["Volume"].iloc[-1])
+    }
 
 @st.cache_data(ttl=600)
 def get_technical_indicators(symbol):
-    try:
-        data = yf.Ticker(symbol).history(period="1mo")
+    data = yf.Ticker(symbol).history(period="1mo")
 
-        data["SMA"] = data["Close"].rolling(14).mean()
-        data["EMA"] = data["Close"].ewm(span=14).mean()
+    data["SMA"] = data["Close"].rolling(14).mean()
+    data["EMA"] = data["Close"].ewm(span=14).mean()
 
-        delta = data["Close"].diff()
-        gain = delta.clip(lower=0)
-        loss = -delta.clip(upper=0)
-        rs = gain.rolling(14).mean() / loss.rolling(14).mean()
-        data["RSI"] = 100 - (100 / (1 + rs))
+    delta = data["Close"].diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+    rs = gain.rolling(14).mean() / loss.rolling(14).mean()
+    data["RSI"] = 100 - (100 / (1 + rs))
 
-        return {
-            "sma": round(data["SMA"].iloc[-1], 2),
-            "ema": round(data["EMA"].iloc[-1], 2),
-            "rsi": round(data["RSI"].iloc[-1], 2)
-        }
-    except:
-        return None
-
-@st.cache_data(ttl=600)
-def get_fundamentals(symbol):
-    try:
-        info = yf.Ticker(symbol).info
-        return {
-            "pe": info.get("trailingPE"),
-            "market_cap": info.get("marketCap"),
-            "roe": info.get("returnOnEquity"),
-            "sector": info.get("sector")
-        }
-    except:
-        return None
+    return {
+        "sma": round(data["SMA"].iloc[-1], 2),
+        "ema": round(data["EMA"].iloc[-1], 2),
+        "rsi": round(data["RSI"].iloc[-1], 2)
+    }
 
 @st.cache_data(ttl=600)
 def get_news(symbol):
     if not NEWS_API_KEY:
         return "News unavailable"
 
+    query = symbol.replace(".NS", "")
+    url = f"https://newsapi.org/v2/everything?q={query}&pageSize=3&apiKey={NEWS_API_KEY}"
+
     try:
-        query = symbol.replace(".NS", "")
-        url = f"https://newsapi.org/v2/everything?q={query}&pageSize=3&apiKey={NEWS_API_KEY}"
         res = requests.get(url).json()
         headlines = [a["title"] for a in res.get("articles", [])]
         return "\n".join(headlines[:3])
@@ -123,85 +70,125 @@ def get_news(symbol):
 
 @st.cache_data(ttl=600)
 def get_chart(symbol):
-    try:
-        return yf.Ticker(symbol).history(period="30d")
-    except:
-        return None
+    return yf.Ticker(symbol).history(period="30d")
+
+
 
 # -------------------------
-# SECTOR DATA
-# -------------------------
-SECTOR_MAP = {
-    "RELIANCE.NS": ["ONGC.NS", "IOC.NS"],
-    "TCS.NS": ["INFY.NS", "WIPRO.NS"]
-}
-
-def get_sector_peers(symbol):
-    return SECTOR_MAP.get(symbol, [])
-
-# -------------------------
-# AGENTS
+# AGENTS (DETAILED OUTPUT)
 # -------------------------
 def llm_call(prompt):
     return llm.invoke([HumanMessage(content=prompt)]).content
 
 def summary_agent(symbol, stock, tech, news):
     return llm_call(f"""
-    Analyze {symbol} stock:
+    Perform a detailed financial analysis for {symbol}.
 
+    Include:
+    1. Market Position
+    2. Technical Trend Analysis
+    3. Volume Interpretation
+    4. News Impact
+    5. Final Recommendation (Buy/Hold/Sell)
+
+    Data:
     Price: {stock}
     Indicators: {tech}
     News: {news}
-
-    Provide structured financial insight and recommendation.
     """)
 
-def fundamental_agent(symbol, fundamentals):
+def bull_agent(symbol, summary):
     return llm_call(f"""
-    Analyze fundamentals of {symbol}:
-
-    PE: {fundamentals['pe']}
-    Market Cap: {fundamentals['market_cap']}
-    ROE: {fundamentals['roe']}
-    Sector: {fundamentals['sector']}
-
-    Give investment insight.
+    Provide a strong bullish case for {symbol}.
+    Include growth potential, strengths, and upside.
+    Keep it structured.
     """)
 
-def macro_agent():
-    return llm_call("""
-    Explain Indian market context:
-
-    - NSE vs BSE
-    - RBI impact
-    - Inflation
-    - Interest rates
-    """)
-
-def recommendation_agent(symbol, summary, tech):
+def bear_agent(symbol, summary):
     return llm_call(f"""
-    Based on {symbol}:
+    Provide a bearish analysis for {symbol}.
+    Include risks, weaknesses, and downside.
+    Keep it structured.
+    """)
 
-    {summary}
+def judge_agent(bull, bear):
+    return llm_call(f"""
+    Compare the bullish and bearish views.
 
-    RSI: {tech['rsi']}
-
-    Give BUY / HOLD / SELL with confidence.
+    Give:
+    - Final balanced conclusion
+    - Clear investment stance (Buy/Hold/Sell)
     """)
 
 def portfolio_agent(data):
     return llm_call(f"""
-    Analyze portfolio:
+    Analyze this portfolio:
 
     {data}
 
-    Give diversification and risk analysis.
+    Include:
+    - Diversification
+    - Risk level
+    - Strengths
+    - Weaknesses
+    - Suggestions
     """)
+
+def macro_agent():
+    return llm_call("""
+    Explain current market conditions:
+
+    - Inflation
+    - Interest rates
+    - Market sentiment
+    - Investment outlook
+    """)
+
+def indicator_agent(tech):
+    return llm_call(f"""
+    Explain these indicators:
+
+    SMA: {tech['sma']}
+    EMA: {tech['ema']}
+    RSI: {tech['rsi']}
+
+    Include what they imply for trading decisions.
+    """)
+
+def recommendation_agent(symbol, summary, tech):
+    return llm_call(f"""
+    Based on this analysis of {symbol}:
+
+    {summary}
+
+    Indicators:
+    RSI: {tech['rsi']}
+    SMA: {tech['sma']}
+    EMA: {tech['ema']}
+
+    Give:
+    1. Final Recommendation (BUY / HOLD / SELL)
+    2. Confidence Level (Low / Medium / High)
+    3. One-line justification
+
+    Keep it short and clear.
+    """)
+
+def calculate_risk_score(tech):
+    rsi = tech['rsi']
+
+    if rsi > 70:
+        return "High Risk (Overbought)"
+    elif rsi < 30:
+        return "Low Risk (Oversold Opportunity)"
+    else:
+        return "Moderate Risk"
+        
 
 # -------------------------
 # UI
 # -------------------------
-st.title("AI Financial Research Platform 🇮🇳")
+st.title("AI Financial Research Platform")
 
 col1, col2 = st.columns(2)
 
@@ -212,24 +199,32 @@ portfolio_input = st.text_input("Portfolio (comma separated)")
 if st.button("Analyze") and symbol1:
 
     symbol1 = symbol1.strip().upper()
+    symbol2 = symbol2.strip().upper()
+
     if not symbol1.endswith(".NS"):
         symbol1 += ".NS"
+
+    if symbol2 and not symbol2.endswith(".NS"):
+        symbol2 += ".NS"
 
     stock = get_stock_data(symbol1)
     tech = get_technical_indicators(symbol1)
     news = get_news(symbol1)
-    fundamentals = get_fundamentals(symbol1)
 
     summary = summary_agent(symbol1, stock, tech, news)
     recommendation = recommendation_agent(symbol1, summary, tech)
+    risk = calculate_risk_score(tech)
+    bull = bull_agent(symbol1, summary)
+    bear = bear_agent(symbol1, summary)
+    verdict = judge_agent(bull, bear)
 
     tabs = st.tabs([
         "Dashboard",
         "AI Summary",
-        "Fundamentals",
-        "Sector Comparison",
-        "Portfolio",
-        "Watchlist",
+        "Debate",
+        "Comparison",
+        "Portfolio AI",
+        "Advanced Indicators",
         "Economic Context"
     ])
 
@@ -246,19 +241,30 @@ if st.button("Analyze") and symbol1:
     # Summary
     with tabs[1]:
         st.write(summary)
-        st.success(recommendation)
 
-    # Fundamentals
+    # Debate
     with tabs[2]:
-        st.write(fundamental_agent(symbol1, fundamentals))
+        st.subheader("Bullish View")
+        st.write(bull)
 
-    # Sector Comparison
+        st.subheader("Bearish View")
+        st.write(bear)
+
+        st.subheader("Final Decision")
+        st.success(verdict)
+
+        
+
+    # Comparison
     with tabs[3]:
-        peers = get_sector_peers(symbol1)
-        for p in peers:
-            data = get_stock_data(p)
-            if data:
-                st.write(f"{p}: ₹{data['price']}")
+        if symbol2:
+            d1 = get_chart(symbol1)
+            d2 = get_chart(symbol2)
+
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=d1.index, y=d1["Close"], name=symbol1))
+            fig.add_trace(go.Scatter(x=d2.index, y=d2["Close"], name=symbol2))
+            st.plotly_chart(fig)
 
     # Portfolio
     with tabs[4]:
@@ -267,19 +273,27 @@ if st.button("Analyze") and symbol1:
             pdata = [get_stock_data(s) for s in symbols if get_stock_data(s)]
             st.write(portfolio_agent(pdata))
 
-    # Watchlist
+    # Indicators
     with tabs[5]:
-        if st.button("Add to Watchlist"):
-            add_stock(symbol1)
+        st.metric("SMA", tech['sma'])
+        st.metric("EMA", tech['ema'])
+        st.metric("RSI", tech['rsi'])
 
-        watchlist = get_watchlist()
-
-        for s in watchlist:
-            col1, col2 = st.columns([3,1])
-            col1.write(s)
-            if col2.button(f"Remove {s}"):
-                delete_stock(s)
+        st.write(indicator_agent(tech))
 
     # Macro
     with tabs[6]:
         st.write(macro_agent())
+
+    st.subheader(" Investment Signal")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+         st.info(recommendation)
+
+    with col2:
+      st.write("*Risk Level:*")
+      st.write(risk)
+
+      st.markdown("---")
