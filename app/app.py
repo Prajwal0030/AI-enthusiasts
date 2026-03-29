@@ -242,30 +242,30 @@ if st.button("Analyze") and symbol_input:
      else:
         st.warning("🔴 Market Closed")
 
-    st.markdown("---")
+      st.markdown("---")
 
-    st.write("### 🇮🇳 Indian Market Insights")
-    st.write("• NSE & BSE dominate Indian equities")
-    st.write("• IT, Banking, FMCG are key sectors")
-    st.write("• Influenced by RBI, inflation, global markets")
+      st.write("### 🇮🇳 Indian Market Insights")
+      st.write("• NSE & BSE dominate Indian equities")
+      st.write("• IT, Banking, FMCG are key sectors")
+      st.write("• Influenced by RBI, inflation, global markets")
 
-    st.markdown("---")
+      st.markdown("---")
 
-    st.write("### 💰 Currency")
-    st.info("All values shown in INR (₹)")
-
-    st.markdown("---")
-
-    st.write("### 🇮🇳 Indian Market Insights")
-
-    st.write("• NSE & BSE dominate Indian equities")
-    st.write("• IT, Banking, FMCG are key sectors")
-    st.write("• Influenced by RBI, inflation, global markets")
+      st.write("### 💰 Currency")
+      st.info("All values shown in INR (₹)")
 
     st.markdown("---")
 
-    st.write("### 💰 Currency")
-    st.info("All values shown in INR (₹)")
+      st.write("### 🇮🇳 Indian Market Insights")
+
+      st.write("• NSE & BSE dominate Indian equities")
+      st.write("• IT, Banking, FMCG are key sectors")
+      st.write("• Influenced by RBI, inflation, global markets")
+
+      st.markdown("---")
+
+      st.write("### 💰 Currency")
+      st.info("All values shown in INR (₹)")
     # -------------------------
     # WATCHLIST (FIXED + CLICKABLE)
     # -------------------------
