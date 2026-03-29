@@ -233,14 +233,26 @@ if st.button("Analyze") and symbol_input:
         st.info("Neutral Zone")
     # Market
     with tabs[6]:
-      st.subheader("📊 Market Context")
- 
-      hour = datetime.now().hour
+     st.subheader("📊 Market Context")
 
-      if 9 <= hour <= 15:
+     hour = datetime.now().hour
+
+     if 9 <= hour <= 15:
         st.success("🟢 Market Open (NSE)")
-      else:
+     else:
         st.warning("🔴 Market Closed")
+
+    st.markdown("---")
+
+    st.write("### 🇮🇳 Indian Market Insights")
+    st.write("• NSE & BSE dominate Indian equities")
+    st.write("• IT, Banking, FMCG are key sectors")
+    st.write("• Influenced by RBI, inflation, global markets")
+
+    st.markdown("---")
+
+    st.write("### 💰 Currency")
+    st.info("All values shown in INR (₹)")
 
     st.markdown("---")
 
@@ -289,6 +301,13 @@ if st.button("Analyze") and symbol_input:
 
      peers = ["TCS.NS","INFY.NS","WIPRO.NS"]
 
+    for p in peers:
+        f = get_fundamentals(p)
+
+        st.write(f"*{p}*")
+        st.write(f"P/E: {f['PE']}")
+        st.write(f"ROE: {f['ROE']}")
+        st.write("---")
     for p in peers:
         f = get_fundamentals(p)
 
