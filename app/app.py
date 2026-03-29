@@ -208,8 +208,8 @@ if st.button("Analyze") and symbol_input:
 
     stock = get_stock_data(symbol)
     if stock is None:
-    st.error("Invalid stock or API issue")
-    st.stop()
+      st.error("Invalid stock or API issue")
+      st.stop()
     tech = get_technical_indicators(symbol)
     news = get_news(symbol)
     fundamentals = get_fundamentals(symbol)
