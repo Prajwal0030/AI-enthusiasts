@@ -233,9 +233,9 @@ if st.button("Analyze") and symbol_input:
         st.info("Neutral Zone")
     # Market
     with tabs[6]:
-     st.subheader("📊 Market Context")
+      st.subheader("📊 Market Context")
  
-     hour = datetime.now().hour
+      hour = datetime.now().hour
 
       if 9 <= hour <= 15:
         st.success("🟢 Market Open (NSE)")
