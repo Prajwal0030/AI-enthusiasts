@@ -192,4 +192,4 @@ if st.session_state.symbol_input:
 
         for p in peers:
             info = get_fundamentals(p)
-            st.write(f"{p} → PE: {info['PE']}, ROE: {info['ROE']}"
+            st.write(f"{p} → PE: {info['PE']}, ROE: {info['ROE']}")
