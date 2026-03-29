@@ -304,7 +304,7 @@ if st.button("Analyze") and symbol_input:
                 st.success(f"{stock_item} removed")
                 st.rerun()
 
-     else:
+    else:
         st.info("No stocks in watchlist yet")
 
     # Market
