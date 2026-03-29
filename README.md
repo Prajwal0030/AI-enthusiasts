@@ -148,7 +148,43 @@ Streamlit Dashboard
 - Portfolio AI analyzer  
 - Advanced indicators (SMA, EMA, RSI)  
 - Economic context agent  
-- Improved structured AI outputs  
+- Improved structured AI outputs
+  
+
+---
+
+# Week 5 Implementation
+
+In Week 5, the project was transformed into a domain-specific Indian stock analysis platform with enhanced financial intelligence features.
+
+Key improvements include:
+
+### Indian Market Integration
+- Integrated NSE stock data using Yahoo Finance (.NS symbols)
+- Enabled real-time Indian stock analysis
+
+### Watchlist System
+- Users can save and manage stocks for future tracking
+- Persistent session-based watchlist implementation
+
+### Fundamental Analysis
+- Implemented core financial metrics:
+  - P/E Ratio
+  - Return on Equity (ROE)
+  - Debt-to-Equity Ratio
+  - Revenue/Earnings Growth
+
+### Sector Comparison
+- Compared major Indian IT stocks (TCS, Infosys, Wipro)
+- Displayed key financial metrics for peer analysis
+
+### Technical Indicators Enhancement
+- SMA, EMA, RSI displayed with real-time values
+- Added interpretation (overbought / oversold / neutral)
+
+### Market Context Module
+- Displays Indian market open/close status
+- Provides macro-level insights for better decision-making
 
 ---
 
