@@ -2,10 +2,10 @@ import streamlit as st
 import yfinance as yf
 import plotly.graph_objects as go
 import requests
-from datetime import datetime
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage
 import os
+from datetime import datetime
 
 # -------------------------
 # CONFIG
@@ -18,32 +18,41 @@ NEWS_API_KEY = os.getenv("NEWS_API_KEY") or st.secrets.get("NEWS_API_KEY")
 llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0)
 
 # -------------------------
-# SESSION STATE INIT
+# SESSION STATE (SAFE)
 # -------------------------
 if "watchlist" not in st.session_state:
     st.session_state.watchlist = []
 
-if "symbol_input" not in st.session_state:
-    st.session_state.symbol_input = ""
+if "current_symbol" not in st.session_state:
+    st.session_state.current_symbol = ""
 
 # -------------------------
 # CALLBACK
 # -------------------------
 def add_to_watchlist():
-    symbol = st.session_state.symbol_input + ".NS"
-    if symbol not in st.session_state.watchlist:
+    symbol = st.session_state.current_symbol
+    if symbol and symbol not in st.session_state.watchlist:
         st.session_state.watchlist.append(symbol)
 
+def load_from_watchlist(symbol):
+    st.session_state.current_symbol = symbol.replace(".NS", "")
+    st.rerun()
+
 # -------------------------
-# DATA FUNCTIONS
+# DATA FUNCTIONS (SAFE)
 # -------------------------
 @st.cache_data(ttl=600)
 def get_stock_data(symbol):
-    data = yf.Ticker(symbol).history(period="7d")
-    return {
-        "price": round(data["Close"].iloc[-1], 2),
-        "volume": int(data["Volume"].iloc[-1])
-    }
+    try:
+        data = yf.Ticker(symbol).history(period="7d")
+        if data.empty:
+            return None
+        return {
+            "price": round(data["Close"].iloc[-1], 2),
+            "volume": int(data["Volume"].iloc[-1])
+        }
+    except:
+        return None
 
 @st.cache_data(ttl=600)
 def get_chart(symbol):
@@ -51,52 +60,80 @@ def get_chart(symbol):
 
 @st.cache_data(ttl=600)
 def get_fundamentals(symbol):
-    info = yf.Ticker(symbol).info
-    return {
-        "PE": info.get("trailingPE"),
-        "ROE": info.get("returnOnEquity"),
-        "DebtToEquity": info.get("debtToEquity"),
-        "RevenueGrowth": info.get("revenueGrowth")
-    }
+    try:
+        info = yf.Ticker(symbol).info
+        return {
+            "PE": info.get("trailingPE"),
+            "ROE": info.get("returnOnEquity"),
+            "Debt": info.get("debtToEquity"),
+            "Growth": info.get("revenueGrowth")
+        }
+    except:
+        return {}
+
+@st.cache_data(ttl=600)
+def get_news(symbol):
+    try:
+        query = symbol.replace(".NS", "")
+        url = f"https://newsapi.org/v2/everything?q={query}&pageSize=3&apiKey={NEWS_API_KEY}"
+        res = requests.get(url).json()
+        return "\n".join([a["title"] for a in res.get("articles", [])[:3]])
+    except:
+        return "No news"
+
+# -------------------------
+# LLM
+# -------------------------
+def llm_call(prompt):
+    try:
+        return llm.invoke([HumanMessage(content=prompt)]).content
+    except:
+        return "AI analysis unavailable"
 
 # -------------------------
 # UI INPUT (CONNECTED)
 # -------------------------
+st.title("📊 AI Financial Intelligence Platform")
+
 symbol_input = st.text_input(
-    "Stock",
-    value=st.session_state.symbol_input
+    "Stock (e.g. RELIANCE)",
+    value=st.session_state.current_symbol
 )
 
-symbol2_input = st.text_input("Compare")
-portfolio_input = st.text_input("Portfolio")
+symbol2_input = st.text_input("Compare (optional)")
+portfolio_input = st.text_input("Portfolio (comma separated)")
 
 # -------------------------
-# ANALYZE TRIGGER
+# ANALYZE FLOW
 # -------------------------
-analyze_clicked = st.button("Analyze")
+if st.button("Analyze") and symbol_input:
 
-if analyze_clicked:
-    st.session_state.symbol_input = symbol_input
-
-if st.session_state.symbol_input:
-
-    symbol = st.session_state.symbol_input.upper()
+    symbol = symbol_input.upper().strip()
     if not symbol.endswith(".NS"):
         symbol += ".NS"
 
+    st.session_state.current_symbol = symbol_input.upper().strip()
+
     stock = get_stock_data(symbol)
+    if not stock:
+        st.error("Stock fetch failed")
+        st.stop()
+
     chart = get_chart(symbol)
     fundamentals = get_fundamentals(symbol)
+    news = get_news(symbol)
 
-    # LLM outputs
-    summary = llm.invoke([HumanMessage(content=f"Analyze {symbol}")]).content
-    bull = llm.invoke([HumanMessage(content=f"Bullish case for {symbol}")]).content
-    bear = llm.invoke([HumanMessage(content=f"Bearish case for {symbol}")]).content
-    judge = llm.invoke([HumanMessage(content=f"Final decision")]).content
+    summary = llm_call(f"Analyze {symbol}. No code.")
+    bull = llm_call(f"Bullish case for {symbol}.")
+    bear = llm_call(f"Bearish case for {symbol}.")
+    judge = llm_call("Give final investment decision.")
 
-    # Add button (callback)
+    # WATCHLIST BUTTON
     st.button("⭐ Add to Watchlist", on_click=add_to_watchlist)
 
+    # -------------------------
+    # TABS
+    # -------------------------
     tabs = st.tabs([
         "Dashboard","Summary","Debate",
         "Comparison","Portfolio","Indicators",
@@ -115,6 +152,8 @@ if st.session_state.symbol_input:
     # Summary
     with tabs[1]:
         st.write(summary)
+        st.write("📰 News:")
+        st.write(news)
 
     # Debate
     with tabs[2]:
@@ -127,7 +166,10 @@ if st.session_state.symbol_input:
     # Comparison
     with tabs[3]:
         if symbol2_input:
-            s2 = symbol2_input.upper() + ".NS"
+            s2 = symbol2_input.upper().strip()
+            if not s2.endswith(".NS"):
+                s2 += ".NS"
+
             d2 = get_chart(s2)
 
             fig = go.Figure()
@@ -138,13 +180,13 @@ if st.session_state.symbol_input:
     # Portfolio
     with tabs[4]:
         if portfolio_input:
-            st.write(llm.invoke([HumanMessage(content=f"Analyze portfolio {portfolio_input}")]).content)
+            st.write(llm_call(f"Analyze portfolio {portfolio_input}"))
 
     # Indicators
     with tabs[5]:
-        st.write("SMA, EMA, RSI calculated internally")
+        st.write("Basic indicators computed internally (SMA, EMA, RSI)")
 
-    # Market Status
+    # Market
     with tabs[6]:
         hour = datetime.now().hour
         if 9 <= hour <= 15:
@@ -153,43 +195,40 @@ if st.session_state.symbol_input:
             st.warning("Market Closed")
 
     # -------------------------
-    # WATCHLIST (CLICKABLE)
+    # WATCHLIST (FIXED + CLICKABLE)
     # -------------------------
     with tabs[7]:
         st.subheader("📌 Watchlist")
 
         if st.session_state.watchlist:
             for s in st.session_state.watchlist:
-
                 col1, col2 = st.columns([3,1])
 
-                # CLICKABLE STOCK
-                if col1.button(f"📊 {s}", key=f"watch_{s}"):
-                    st.session_state.symbol_input = s.replace(".NS", "")
-                    st.rerun()
+                # CLICK → LOAD ANALYSIS
+                if col1.button(f"📊 {s}", key=f"load_{s}"):
+                    load_from_watchlist(s)
 
-                # DELETE
-                if col2.button("❌", key=f"del_{s}"):
+                # REMOVE
+                if col2.button("❌", key=f"remove_{s}"):
                     st.session_state.watchlist.remove(s)
                     st.rerun()
-
         else:
             st.info("No stocks in watchlist yet")
 
     # Fundamentals
     with tabs[8]:
         st.write("### Fundamental Analysis")
-        st.write(f"P/E Ratio: {fundamentals['PE']}")
-        st.write(f"ROE: {fundamentals['ROE']}")
-        st.write(f"Debt/Equity: {fundamentals['DebtToEquity']}")
-        st.write(f"Revenue Growth: {fundamentals['RevenueGrowth']}")
+        st.write(f"P/E: {fundamentals.get('PE')}")
+        st.write(f"ROE: {fundamentals.get('ROE')}")
+        st.write(f"Debt/Equity: {fundamentals.get('Debt')}")
+        st.write(f"Growth: {fundamentals.get('Growth')}")
 
-    # Sector Comparison
+    # Sector
     with tabs[9]:
         st.write("### Sector Comparison")
 
         peers = ["TCS.NS","INFY.NS","WIPRO.NS"]
 
         for p in peers:
-            info = get_fundamentals(p)
-            st.write(f"{p} → PE: {info['PE']}, ROE: {info['ROE']}")
+            f = get_fundamentals(p)
+            st.write(f"{p} → PE: {f.get('PE')} | ROE: {f.get('ROE')}")
