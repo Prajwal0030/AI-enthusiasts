@@ -195,8 +195,7 @@ if st.button("Analyze") and symbol_input:
 
         watchlist = st.session_state.watchlist
 
-        # DEBUG (REMOVE LATER)
-        st.write("DEBUG:", watchlist)
+        
 
         if watchlist:
             for s in watchlist:
