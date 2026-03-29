@@ -197,6 +197,11 @@ if "watchlist_symbol" in st.session_state:
     symbol_input = st.session_state.watchlist_symbol
     st.session_state.watchlist_symbol = None
 
+# Watchlist click handler
+if "selected_stock" in st.session_state:
+    symbol_input = st.session_state.selected_stock.replace(".NS", "")
+    del st.session_state.selected_stock
+
 if st.button("Analyze") and symbol_input:
 
     symbol = symbol_input.upper().strip() + ".NS"
@@ -271,17 +276,36 @@ if st.button("Analyze") and symbol_input:
 
     # Watchlist
     with tabs[7]:
-        if st.button("Add to Watchlist"):
-            add_stock(symbol)
+    st.subheader("📌 Watchlist")
 
-        for s in get_watchlist():
+    # Add current stock
+    if st.button("➕ Add Current Stock"):
+        add_stock(symbol)
+        st.success(f"{symbol} added to watchlist")
+
+    st.markdown("---")
+
+    watchlist = get_watchlist()
+
+    if watchlist:
+        st.write("### Saved Stocks")
+
+        for stock_item in watchlist:
             col1, col2 = st.columns([3,1])
-            if col1.button(s):
-                st.session_state.watchlist_symbol = s
+
+            # CLICK TO ANALYZE
+            if col1.button(f"📊 {stock_item}", key=f"view_{stock_item}"):
+                st.session_state.selected_stock = stock_item
                 st.rerun()
-            if col2.button("Remove", key=s):
-                delete_stock(s)
+
+            # DELETE
+            if col2.button("❌", key=f"del_{stock_item}"):
+                delete_stock(stock_item)
+                st.success(f"{stock_item} removed")
                 st.rerun()
+
+     else:
+        st.info("No stocks in watchlist yet")
 
     # Market
     with tabs[8]:
