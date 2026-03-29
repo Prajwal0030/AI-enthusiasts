@@ -128,7 +128,7 @@ def llm_call(prompt):
 # -------------------------
 # UI INPUT (CONNECTED)
 # -------------------------
-st.title("📊 AI Financial Intelligence Platform")
+st.title("AI Financial Intelligence Platform")
 
 symbol_input = st.text_input(
     "Stock (e.g. RELIANCE)",
@@ -164,7 +164,7 @@ if st.button("Analyze") and symbol_input:
     judge = llm_call("Give final investment decision.")
 
     # WATCHLIST BUTTON
-    st.button("⭐ Add to Watchlist", on_click=add_to_watchlist)
+    st.button("Add to Watchlist", on_click=add_to_watchlist)
 
     # -------------------------
     # TABS
@@ -187,7 +187,7 @@ if st.button("Analyze") and symbol_input:
     # Summary
     with tabs[1]:
         st.write(summary)
-        st.write("📰 News:")
+        st.write("News:")
         st.write(news)
 
     # Debate
@@ -233,14 +233,14 @@ if st.button("Analyze") and symbol_input:
             st.info("Neutral Zone")
     # Market
     with tabs[6]:
-        st.subheader("📊 Market Context")
+        st.subheader("Market Context")
 
         hour = datetime.now().hour
 
         if 9 <= hour <= 15:
-          st.success("🟢 Market Open (NSE)")
+          st.success("Market Open (NSE)")
         else:
-          st.warning("🔴 Market Closed")
+          st.warning("Market Closed")
 
         st.markdown("---")
 
@@ -251,7 +251,7 @@ if st.button("Analyze") and symbol_input:
 
         st.markdown("---")
 
-        st.write("### 💰 Currency")
+        st.write("### Currency")
         st.info("All values shown in INR (₹)")
 
         st.markdown("---")
@@ -262,14 +262,14 @@ if st.button("Analyze") and symbol_input:
     # WATCHLIST (FIXED + CLICKABLE)
     # -------------------------
     with tabs[7]:
-        st.subheader("📌 Watchlist")
+        st.subheader("Watchlist")
 
         if st.session_state.watchlist:
             for s in st.session_state.watchlist:
                 col1, col2 = st.columns([3,1])
 
                 # CLICK → LOAD ANALYSIS
-                if col1.button(f"📊 {s}", key=f"load_{s}"):
+                if col1.button(f" {s}", key=f"load_{s}"):
                     load_from_watchlist(s)
 
                 # REMOVE
