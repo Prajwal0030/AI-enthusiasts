@@ -219,17 +219,17 @@ if st.button("Analyze") and symbol_input:
 
     # Indicators
    with tabs[5]:
-    indicators = get_indicators(symbol)
+     indicators = get_indicators(symbol)
 
-    st.metric("SMA (14)", indicators["SMA"])
-    st.metric("EMA (14)", indicators["EMA"])
-    st.metric("RSI", indicators["RSI"])
+     st.metric("SMA (14)", indicators["SMA"])
+     st.metric("EMA (14)", indicators["EMA"])
+     st.metric("RSI", indicators["RSI"])
 
-    if indicators["RSI"] > 70:
+     if indicators["RSI"] > 70:
         st.warning("Overbought (High Risk)")
-    elif indicators["RSI"] < 30:
+     elif indicators["RSI"] < 30:
         st.success("Oversold (Opportunity)")
-    else:
+     else:
         st.info("Neutral Zone")
     # Market
     with tabs[6]:
