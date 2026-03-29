@@ -207,6 +207,9 @@ if st.button("Analyze") and symbol_input:
     symbol = symbol_input.upper().strip() + ".NS"
 
     stock = get_stock_data(symbol)
+    if stock is None:
+    st.error("Invalid stock or API issue")
+    st.stop()
     tech = get_technical_indicators(symbol)
     news = get_news(symbol)
     fundamentals = get_fundamentals(symbol)
@@ -222,7 +225,12 @@ if st.button("Analyze") and symbol_input:
 
     # Dashboard
     with tabs[0]:
-        st.metric("Price", stock["price"])
+        if stock:
+             st.metric("Price", stock["price"])
+             st.metric("Volume", stock["volume"])
+        else:
+            st.error("Failed to fetch stock data. Try again.")
+            st.stop()
         st.metric("Volume", stock["volume"])
         st.metric("Score", stock_score(tech))
 
