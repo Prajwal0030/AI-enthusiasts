@@ -242,7 +242,7 @@ if st.button("Analyze") and symbol_input:
      else:
         st.warning("🔴 Market Closed")
 
-      st.markdown("---")
+     st.markdown("---")
 
       st.write("### 🇮🇳 Indian Market Insights")
       st.write("• NSE & BSE dominate Indian equities")
