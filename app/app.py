@@ -2,7 +2,6 @@ import streamlit as st
 import yfinance as yf
 import plotly.graph_objects as go
 import requests
-import sqlite3
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage
 import os
@@ -18,57 +17,22 @@ NEWS_API_KEY = os.getenv("NEWS_API_KEY") or st.secrets.get("NEWS_API_KEY")
 llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0)
 
 # -------------------------
-# WATCHLIST STORAGE (SESSION + DB)
+# STEP 2: SESSION INIT (TOP)
 # -------------------------
+if "watchlist" not in st.session_state:
+    st.session_state.watchlist = []
 
-USE_SESSION = True  # 🔥 CHANGE TO False IF LOCAL DB WORKS
+if "current_symbol" not in st.session_state:
+    st.session_state.current_symbol = None
 
-if USE_SESSION:
-    if "watchlist" not in st.session_state:
-        st.session_state.watchlist = []
-
-    def add_stock(symbol):
+# -------------------------
+# STEP 1: CALLBACK FUNCTION
+# -------------------------
+def handle_add_watchlist():
+    if st.session_state.current_symbol:
+        symbol = st.session_state.current_symbol
         if symbol not in st.session_state.watchlist:
             st.session_state.watchlist.append(symbol)
-
-    def get_watchlist():
-        return st.session_state.watchlist
-
-    def delete_stock(symbol):
-        if symbol in st.session_state.watchlist:
-            st.session_state.watchlist.remove(symbol)
-
-else:
-    def init_db():
-        conn = sqlite3.connect("watchlist.db")
-        c = conn.cursor()
-        c.execute("CREATE TABLE IF NOT EXISTS watchlist (symbol TEXT PRIMARY KEY)")
-        conn.commit()
-        conn.close()
-
-    def add_stock(symbol):
-        conn = sqlite3.connect("watchlist.db")
-        c = conn.cursor()
-        c.execute("INSERT OR IGNORE INTO watchlist VALUES (?)", (symbol,))
-        conn.commit()
-        conn.close()
-
-    def get_watchlist():
-        conn = sqlite3.connect("watchlist.db")
-        c = conn.cursor()
-        c.execute("SELECT symbol FROM watchlist")
-        data = c.fetchall()
-        conn.close()
-        return [d[0] for d in data]
-
-    def delete_stock(symbol):
-        conn = sqlite3.connect("watchlist.db")
-        c = conn.cursor()
-        c.execute("DELETE FROM watchlist WHERE symbol=?", (symbol,))
-        conn.commit()
-        conn.close()
-
-    init_db()
 
 # -------------------------
 # DATA FUNCTIONS
@@ -129,9 +93,9 @@ def llm_call(prompt):
 # -------------------------
 st.title("📊 AI Financial Intelligence Platform")
 
-symbol_input = st.text_input("Stock")
-symbol2_input = st.text_input("Compare")
-portfolio_input = st.text_input("Portfolio")
+symbol_input = st.text_input("Stock (e.g. RELIANCE)")
+symbol2_input = st.text_input("Compare (optional)")
+portfolio_input = st.text_input("Portfolio (comma separated)")
 
 # -------------------------
 # MAIN FLOW
@@ -142,7 +106,9 @@ if st.button("Analyze") and symbol_input:
     if not symbol.endswith(".NS"):
         symbol += ".NS"
 
-    # ✅ STEP 1: STORE SYMBOL
+    # -------------------------
+    # STEP 3: STORE SYMBOL
+    # -------------------------
     st.session_state.current_symbol = symbol
 
     stock = get_stock_data(symbol)
@@ -153,23 +119,25 @@ if st.button("Analyze") and symbol_input:
     tech = get_technical_indicators(symbol)
     news = get_news(symbol)
 
-    summary = llm_call(f"Analyze {symbol} briefly. No code.")
+    summary = llm_call(f"Analyze {symbol}. No code.")
     bull = llm_call(f"Bullish case for {symbol}.")
     bear = llm_call(f"Bearish case for {symbol}.")
     judge = llm_call("Final decision.")
 
-    # ✅ STEP 2: FIX BUTTON
-    if st.button("⭐ Add to Watchlist"):
-        if "current_symbol" in st.session_state:
-            add_stock(st.session_state.current_symbol)
-            st.success(f"{st.session_state.current_symbol} added")
-        else:
-            st.warning("Analyze first")
+    # -------------------------
+    # STEP 4: FIX BUTTON (CALLBACK)
+    # -------------------------
+    st.button("⭐ Add to Watchlist", on_click=handle_add_watchlist)
 
     tabs = st.tabs([
-        "Dashboard","Summary","Debate",
-        "Comparison","Portfolio","Indicators",
-        "Market","Watchlist"
+        "Dashboard",
+        "Summary",
+        "Debate",
+        "Comparison",
+        "Portfolio",
+        "Indicators",
+        "Market",
+        "Watchlist"
     ])
 
     # Dashboard
@@ -187,21 +155,23 @@ if st.button("Analyze") and symbol_input:
 
     # Debate
     with tabs[2]:
-        st.write("Bull:", bull)
-        st.write("Bear:", bear)
+        st.write("### Bull")
+        st.write(bull)
+        st.write("### Bear")
+        st.write(bear)
         st.success(judge)
 
     # Comparison
     with tabs[3]:
         if symbol2_input:
-            s2 = symbol2_input.upper()
+            s2 = symbol2_input.upper().strip()
             if not s2.endswith(".NS"):
                 s2 += ".NS"
             d1 = get_chart(symbol)
             d2 = get_chart(s2)
             fig = go.Figure()
-            fig.add_trace(go.Scatter(x=d1.index,y=d1["Close"],name=symbol))
-            fig.add_trace(go.Scatter(x=d2.index,y=d2["Close"],name=s2))
+            fig.add_trace(go.Scatter(x=d1.index, y=d1["Close"], name=symbol))
+            fig.add_trace(go.Scatter(x=d2.index, y=d2["Close"], name=s2))
             st.plotly_chart(fig)
 
     # Portfolio
@@ -217,25 +187,19 @@ if st.button("Analyze") and symbol_input:
     with tabs[6]:
         st.write(llm_call("Explain Indian market briefly"))
 
-    # Watchlist
+    # -------------------------
+    # STEP 5: WATCHLIST TAB
+    # -------------------------
     with tabs[7]:
         st.subheader("📌 Watchlist")
 
-        watchlist = get_watchlist()
+        watchlist = st.session_state.watchlist
 
-        # ✅ STEP 3: DEBUG
+        # DEBUG (REMOVE LATER)
         st.write("DEBUG:", watchlist)
 
         if watchlist:
             for s in watchlist:
-                col1, col2 = st.columns([3,1])
-
-                if col1.button(f"📊 {s}", key=f"view_{s}"):
-                    st.session_state.current_symbol = s
-                    st.rerun()
-
-                if col2.button("❌", key=f"del_{s}"):
-                    delete_stock(s)
-                    st.rerun()
+                st.write(f"📊 {s}")
         else:
             st.info("No stocks in watchlist yet")
