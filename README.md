@@ -185,6 +185,37 @@ Key improvements include:
 ### Market Context Module
 - Displays Indian market open/close status
 - Provides macro-level insights for better decision-making
+  
+
+---
+
+# Week 6 Implementation
+
+In Week 6, the project was enhanced with advanced financial intelligence features to make the system more practical and decision-driven.
+
+### Portfolio Intelligence
+
+- Introduced portfolio scoring system (0–100)
+- Evaluates diversification and risk using technical indicators
+
+### Risk Analysis Engine
+
+- Classifies stocks into Low, Moderate, and High risk
+- Helps users understand investment safety
+
+### Real-Time Alerts
+
+- Added Buy/Sell signals based on RSI levels
+- Provides actionable insights for trading decisions
+
+### Multi-Asset Support
+
+- Extended analysis beyond stocks:
+  - Gold (Commodities)
+  - USD/INR (Currency)
+  - Bitcoin (Crypto)
+
+These upgrades transformed the system into a more production-ready financial assistant with deeper analytical capabilities.
 
 ---
 
