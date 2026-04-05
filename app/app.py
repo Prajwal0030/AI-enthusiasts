@@ -266,7 +266,7 @@ if st.button("Analyze") and symbol_input:
 
         risk = risk_engine(indicators["RSI"])
 
-        st.write("### 🚨 Alerts")
+        st.write("###  Alerts")
         st.write(f"Risk Level: {risk}")
 
         if indicators["RSI"] > 70:
