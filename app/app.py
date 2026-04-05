@@ -125,6 +125,33 @@ def llm_call(prompt):
     except:
         return "AI analysis unavailable"
 
+def portfolio_score(symbols):
+    score = 0
+    total = 0
+
+    for s in symbols:
+        if not s.endswith(".NS"):
+            s += ".NS"
+
+        tech = get_indicators(s)
+
+        if tech["RSI"] < 70:
+            score += 1
+        if tech["RSI"] > 30:
+            score += 1
+
+        total += 2
+
+    return round((score / total) * 100, 2) if total else 0
+
+def risk_engine(rsi):
+    if rsi > 70:
+        return "High Risk"
+    elif rsi < 30:
+        return "Low Risk"
+    else:
+        return "Moderate Risk"
+
 # -------------------------
 # UI INPUT (CONNECTED)
 # -------------------------
@@ -172,7 +199,7 @@ if st.button("Analyze") and symbol_input:
     tabs = st.tabs([
         "Dashboard","Summary","Debate",
         "Comparison","Portfolio","Indicators",
-        "Market","Watchlist","Fundamentals","Sector"
+        "Market","Watchlist","Fundamentals","Sector","Assets"
     ])
 
     # Dashboard
@@ -215,8 +242,13 @@ if st.button("Analyze") and symbol_input:
     # Portfolio
     with tabs[4]:
         if portfolio_input:
-            st.write(llm_call(f"Analyze portfolio {portfolio_input}"))
+            symbols = [s.strip().upper() for s in portfolio_input.split(",")]
 
+            score = portfolio_score(symbols)
+
+            st.metric("Portfolio Score", f"{score}/100")
+
+            st.write(llm_call(f"Analyze portfolio {portfolio_input}"))
     # Indicators
     with tabs[5]:
         indicators = get_indicators(symbol)
@@ -231,6 +263,20 @@ if st.button("Analyze") and symbol_input:
             st.success("Oversold (Opportunity)")
         else:
             st.info("Neutral Zone")
+
+        risk = risk_engine(indicators["RSI"])
+
+        st.write("### 🚨 Alerts")
+        st.write(f"Risk Level: {risk}")
+
+        if indicators["RSI"] > 70:
+            st.error("SELL SIGNAL: Overbought")
+
+        elif indicators["RSI"] < 30:
+            st.success("BUY SIGNAL: Oversold")
+
+        else:
+            st.info("No strong signal") 
     # Market
     with tabs[6]:
         st.subheader("Market Context")
@@ -303,3 +349,25 @@ if st.button("Analyze") and symbol_input:
         st.write("---")
         
         st.write(f"{p} → PE: {f.get('PE')} | ROE: {f.get('ROE')}")
+
+    with tabs[10]:
+      st.subheader("Multi-Asset Analysis")
+
+    # GOLD
+      gold = get_stock_data("GC=F")
+
+    # USDINR
+      usd = get_stock_data("INR=X")
+
+    # BTC
+      btc = get_stock_data("BTC-USD")
+
+      if gold:
+         st.metric("Gold", gold["price"])
+
+      if usd:
+         st.metric("USD/INR", usd["price"])
+
+      if btc:
+         st.metric("Bitcoin", btc["price"])
+    
