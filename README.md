@@ -219,49 +219,47 @@ These upgrades transformed the system into a more production-ready financial ass
 
 ---
 
-Week 7 Implementation
+# Week 7 Implementation
 
 In Week 7, the project was refined with a strong focus on UI enhancement, usability, and production-level improvements.
 
 Key improvements include:
 
-UI & Visualization Enhancements
+### UI & Visualization Enhancements
 
 - Improved dashboard charts with SMA and EMA overlays
 - Cleaner layout with better spacing and structured sections
 - Enhanced user experience for smoother navigation
 
-Sentiment Analysis Integration
+### Sentiment Analysis Integration
 
 - Implemented news-based sentiment detection
 - Displays bullish or bearish outlook based on recent headlines
 
-Export Functionality
+### Export Functionality
 
 - Added report download feature
 - Users can export AI-generated analysis along with news insights
 
-Portfolio Cards
+### Portfolio Cards
 
 - Introduced card-based portfolio visualization
 - Each asset shows RSI and corresponding risk level
 - Enables quick comparison of multiple stocks
 
-Validation & Error Handling
+### Validation & Error Handling
 
 - Added input validation for stock symbols
 - Improved error messages for invalid or missing data
 - Ensured stable behavior across all tabs
 
-System Refinement
+### System Refinement
 
 - Fixed tab-level inconsistencies
 - Improved comparison and watchlist interaction
 - Optimized overall performance
 
 This week focused on transforming the platform into a more polished, user-friendly, and production-ready financial intelligence system.
-
----
 
 ---
 
