@@ -106,7 +106,7 @@ def risk_engine(rsi):
     return "Moderate Risk"
 
 # ---------------- UI ----------------
-st.title("📊 AI Financial Intelligence Platform")
+st.title("Multi Agent Financial Research AI")
 
 symbol_input = st.text_input("Stock (e.g. RELIANCE)", value=st.session_state.current_symbol)
 compare_input = st.text_input("Compare Stock")
@@ -159,7 +159,7 @@ if st.button("Analyze") and symbol_input:
     with tabs[1]:
         st.write(summary)
 
-        st.subheader("📰 Sentiment")
+        st.subheader("Sentiment")
         if any("gain" in n.lower() or "rise" in n.lower() for n in news):
             st.success("Bullish")
         else:
